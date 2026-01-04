@@ -3,6 +3,7 @@ import json
 import time
 import random
 import os
+import sys
 from glob import glob
 from pathlib import Path
 from typing import Optional, Dict, Tuple, Union, List
@@ -106,26 +107,32 @@ class BrowserAutomation:
                 if 'headless' not in arg.lower() and 'AutomationControlled' not in arg:
                     uc_options.add_argument(arg)
             
-            # IMPORTANT: Always use NON-HEADLESS mode when DISPLAY is available
+            # IMPORTANT: For Cloudflare bypass, prefer non-headless mode when possible
             # Cloudflare easily detects headless browsers, even with stealth patches
-            # Check if we have DISPLAY available (from Xvfb)
+            # Check if we have DISPLAY available (from Xvfb on Linux servers)
             display_available = os.environ.get('DISPLAY') is not None
             display_value = os.environ.get('DISPLAY', 'NOT SET')
-            logger.info(f"DISPLAY environment variable: {display_value}")
+            is_linux = sys.platform.startswith('linux')
             
-            # Force non-headless mode if DISPLAY is available (which it should be with Xvfb)
-            if display_available:
-                # Non-headless mode - REQUIRED for Cloudflare bypass
-                logger.info("✅ Using non-headless mode (DISPLAY available) - better for Cloudflare bypass")
+            logger.info(f"DISPLAY environment variable: {display_value}")
+            logger.info(f"Platform: {sys.platform}, HEADLESS_BROWSER setting: {config.HEADLESS_BROWSER}")
+            
+            # On Linux servers with Xvfb: use non-headless if DISPLAY is available
+            # On Windows/Mac local: respect HEADLESS_BROWSER setting
+            if is_linux and display_available:
+                # Linux server with Xvfb - use non-headless for better Cloudflare bypass
+                logger.info("✅ Using non-headless mode (Linux server with DISPLAY) - better for Cloudflare bypass")
                 # DO NOT add --headless argument - this is critical!
             elif config.HEADLESS_BROWSER:
-                # Only use headless as absolute last resort
-                logger.warning("⚠️ Using headless mode as fallback (DISPLAY not available) - Cloudflare may block!")
+                # Headless mode requested (local Windows/Mac or server without Xvfb)
+                logger.info("Using headless mode as configured")
                 uc_options.add_argument('--headless=new')
                 uc_options.add_argument('--disable-gpu')
+                # Additional options for headless mode
+                uc_options.add_argument('--disable-software-rasterizer')
             else:
-                # Non-headless even without DISPLAY (may fail but worth trying)
-                logger.info("Using non-headless mode (no DISPLAY, but HEADLESS_BROWSER=false)")
+                # Non-headless mode requested (local testing)
+                logger.info("Using non-headless mode (HEADLESS_BROWSER=false)")
             
             # Add window size (important for proper rendering)
             uc_options.add_argument('--window-size=1920,1080')
