@@ -152,9 +152,9 @@ class BrowserAutomation:
                 # Non-headless even without DISPLAY (may fail but worth trying)
                 logger.info("Using non-headless mode (no DISPLAY, but HEADLESS_BROWSER=false)")
             
-            # Add window size (important for proper rendering)
-            uc_options.add_argument('--window-size=1920,1080')
-            uc_options.add_argument('--start-maximized')
+            # Add window size (smaller to save memory - matches common_args)
+            # Window size is already set in common_args, but we ensure it here too
+            uc_options.add_argument('--window-size=1280,720')
             
             # Try to find Chrome binary
             chrome_paths = [
