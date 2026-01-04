@@ -273,8 +273,9 @@ class BrowserAutomation:
         
         try:
             self.driver.get(self.base_url)
-            # Wait for Cloudflare challenge to complete
-            time.sleep(8)
+            # Wait for Cloudflare challenge to complete (can take 15-30 seconds)
+            logger.info("Waiting for Cloudflare challenge to complete after loading base URL...")
+            time.sleep(15)  # Increased wait time for Cloudflare
             
             with open(self.cookies_path, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)
