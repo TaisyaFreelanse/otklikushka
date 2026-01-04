@@ -27,13 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Microsoft Edge
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg \
-    && install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/ \
-    && sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/microsoft.gpg] https://packages.microsoft.com/repos/edge stable main" > /etc/apt/sources.list.d/microsoft-edge-dev.list' \
-    && rm microsoft.gpg \
+# Install Google Chrome (better for Linux servers)
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
     && apt-get update \
-    && apt-get install -y microsoft-edge-stable \
+    && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -53,7 +51,7 @@ RUN mkdir -p /app/data || true
 
 # Set environment variables for headless mode
 ENV HEADLESS_BROWSER=true
-ENV BROWSER_TYPE=edge
+ENV BROWSER_TYPE=chrome
 ENV DISPLAY=:99
 
 # Expose port for health check

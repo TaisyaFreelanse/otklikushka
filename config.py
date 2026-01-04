@@ -46,5 +46,5 @@ DATABASE_PATH = DATA_DIR / DATABASE_FILE
 
 # Browser Configuration
 HEADLESS_BROWSER = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
-BROWSER_TYPE = os.getenv("BROWSER_TYPE", "edge")  # edge or chrome
+BROWSER_TYPE = os.getenv("BROWSER_TYPE", "chrome")  # chrome or edge (chrome works better on Linux servers)
 

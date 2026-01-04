@@ -5,13 +5,15 @@ import random
 import os
 from glob import glob
 from pathlib import Path
-from typing import Optional, Dict, Tuple, Union
+from typing import Optional, Dict, Tuple, Union, List
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.edge.options import Options as EdgeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.common.exceptions import (
     TimeoutException, 
     NoSuchElementException,
@@ -33,84 +35,159 @@ class BrowserAutomation:
         self.cookies_path = config.COOKIES_PATH
         
     def init_driver(self) -> Union[webdriver.Edge, webdriver.Chrome]:
+        """Initialize browser WebDriver (Chrome or Edge)."""
+        browser_type = config.BROWSER_TYPE.lower()
+        
+        # Common options for both browsers
+        common_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--window-size=1920,1080',
+            '--disable-gpu',
+        ]
+        
+        if config.HEADLESS_BROWSER:
+            common_args.append('--headless=new')
+        
+        # Try Chrome first (better for Linux servers)
+        if browser_type == "chrome" or browser_type != "edge":
+            try:
+                return self._init_chrome(common_args)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Chrome, trying Edge: {e}")
+                # Fallback to Edge if Chrome fails
+                try:
+                    return self._init_edge(common_args)
+                except Exception as e2:
+                    logger.error(f"Failed to initialize Edge as fallback: {e2}")
+                    raise Exception(f"Не удалось инициализировать браузер (Chrome и Edge). Попробуйте проверить установку.")
+        else:
+            # Try Edge first
+            try:
+                return self._init_edge(common_args)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Edge, trying Chrome: {e}")
+                # Fallback to Chrome if Edge fails
+                try:
+                    return self._init_chrome(common_args)
+                except Exception as e2:
+                    logger.error(f"Failed to initialize Chrome as fallback: {e2}")
+                    raise Exception(f"Не удалось инициализировать браузер (Edge и Chrome). Попробуйте проверить установку.")
+    
+    def _init_chrome(self, common_args: List[str]) -> webdriver.Chrome:
+        """Initialize Chrome WebDriver."""
+        chrome_options = ChromeOptions()
+        
+        for arg in common_args:
+            chrome_options.add_argument(arg)
+        
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
+        driver = None
+        
+        # Method 1: Try with automatic driver management (Selenium 4+)
+        try:
+            driver = webdriver.Chrome(options=chrome_options)
+        except Exception:
+            # Method 2: Try using webdriver-manager
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                driver_path = ChromeDriverManager().install()
+                service = ChromeService(executable_path=driver_path)
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+            except Exception:
+                # Method 3: Try system chrome/chromium
+                try:
+                    # Try common paths
+                    chrome_paths = [
+                        '/usr/bin/google-chrome',
+                        '/usr/bin/chromium',
+                        '/usr/bin/chromium-browser',
+                    ]
+                    chrome_binary = None
+                    for path in chrome_paths:
+                        if os.path.exists(path):
+                            chrome_binary = path
+                            break
+                    
+                    if chrome_binary:
+                        chrome_options.binary_location = chrome_binary
+                        driver = webdriver.Chrome(options=chrome_options)
+                    else:
+                        raise Exception("Chrome binary not found")
+                except Exception as e:
+                    raise Exception(f"Не удалось инициализировать ChromeDriver: {e}")
+        
+        # Remove webdriver property
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        return driver
+    
+    def _init_edge(self, common_args: List[str]) -> webdriver.Edge:
         """Initialize Edge WebDriver."""
         edge_options = EdgeOptions()
         
-        if config.HEADLESS_BROWSER:
-            edge_options.add_argument('--headless')
+        for arg in common_args:
+            edge_options.add_argument(arg)
         
-        edge_options.add_argument('--no-sandbox')
-        edge_options.add_argument('--disable-dev-shm-usage')
-        edge_options.add_argument('--disable-blink-features=AutomationControlled')
         edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         edge_options.add_experimental_option('useAutomationExtension', False)
         edge_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0')
         
-        # Window size for headless mode
-        edge_options.add_argument('--window-size=1920,1080')
-        
-        # Try different methods to initialize EdgeDriver
         driver = None
         
         # Method 1: Try with automatic driver management (Selenium 4+)
         try:
             driver = webdriver.Edge(options=edge_options)
-        except Exception as e1:
-            # Method 2: Try to find EdgeDriver in common locations
+        except Exception:
+            # Method 2: Try using webdriver-manager
             try:
-                edge_paths = [
-                    os.path.join(os.environ.get('ProgramFiles', ''), 'Microsoft', 'Edge', 'Application'),
-                    os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'Microsoft', 'Edge', 'Application'),
-                ]
-                
-                possible_paths = []
-                for edge_path in edge_paths:
-                    if os.path.exists(edge_path):
-                        driver_in_edge = os.path.join(edge_path, 'msedgedriver.exe')
-                        if os.path.exists(driver_in_edge):
-                            possible_paths.append(driver_in_edge)
-                        for item in os.listdir(edge_path):
-                            sub_path = os.path.join(edge_path, item, 'msedgedriver.exe')
-                            if os.path.exists(sub_path):
-                                possible_paths.append(sub_path)
-                
-                possible_paths.extend([
-                    os.path.join(os.path.expanduser('~'), '.wdm', 'drivers', 'edgedriver', '*', 'msedgedriver.exe'),
-                    os.path.join(os.getcwd(), 'msedgedriver.exe'),
-                    'msedgedriver.exe',
-                ])
-                
-                driver_path = None
-                for path in possible_paths:
-                    if '*' in path:
-                        matches = glob(path)
-                        if matches:
-                            driver_path = matches[0]
-                            break
-                    elif os.path.exists(path):
-                        driver_path = path
-                        break
-                
-                if driver_path:
-                    service = EdgeService(executable_path=driver_path)
-                    driver = webdriver.Edge(service=service, options=edge_options)
-                else:
-                    raise Exception("EdgeDriver не найден")
-                    
-            except Exception as e2:
-                # Method 3: Try using Service without path
+                from webdriver_manager.microsoft import EdgeChromiumDriverManager
+                driver_path = EdgeChromiumDriverManager().install()
+                service = EdgeService(executable_path=driver_path)
+                driver = webdriver.Edge(service=service, options=edge_options)
+            except Exception:
+                # Method 3: Try to find EdgeDriver in common locations
                 try:
-                    service = EdgeService()
-                    driver = webdriver.Edge(service=service, options=edge_options)
-                except Exception as e3:
-                    # Method 4: Try using webdriver-manager
-                    try:
-                        from webdriver_manager.microsoft import EdgeChromiumDriverManager
-                        driver_path = EdgeChromiumDriverManager().install()
+                    edge_paths = [
+                        os.path.join(os.environ.get('ProgramFiles', ''), 'Microsoft', 'Edge', 'Application'),
+                        os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'Microsoft', 'Edge', 'Application'),
+                    ]
+                    
+                    possible_paths = []
+                    for edge_path in edge_paths:
+                        if os.path.exists(edge_path):
+                            driver_in_edge = os.path.join(edge_path, 'msedgedriver.exe')
+                            if os.path.exists(driver_in_edge):
+                                possible_paths.append(driver_in_edge)
+                    
+                    possible_paths.extend([
+                        os.path.join(os.path.expanduser('~'), '.wdm', 'drivers', 'edgedriver', '*', 'msedgedriver.exe'),
+                        os.path.join(os.getcwd(), 'msedgedriver.exe'),
+                        'msedgedriver.exe',
+                    ])
+                    
+                    driver_path = None
+                    for path in possible_paths:
+                        if '*' in path:
+                            matches = glob(path)
+                            if matches:
+                                driver_path = matches[0]
+                                break
+                        elif os.path.exists(path):
+                            driver_path = path
+                            break
+                    
+                    if driver_path:
                         service = EdgeService(executable_path=driver_path)
                         driver = webdriver.Edge(service=service, options=edge_options)
-                    except Exception as e4:
-                        raise Exception(f"Не удалось инициализировать EdgeDriver. Все методы не сработали. Попробуйте скачать EdgeDriver вручную.")
+                    else:
+                        raise Exception("EdgeDriver не найден")
+                except Exception as e:
+                    raise Exception(f"Не удалось инициализировать EdgeDriver: {e}")
         
         # Remove webdriver property
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
