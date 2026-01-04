@@ -316,10 +316,10 @@ class FreelancehuntScraper:
             url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
             self.browser.driver.get(url)
             
-            # Wait for Cloudflare challenge to complete (can take up to 10-15 seconds)
+            # Wait for Cloudflare challenge to complete (can take up to 30-45 seconds)
             logger.info(f"Waiting for page {page} to load (Cloudflare challenge may appear)...")
-            max_wait = 20  # Maximum wait time in seconds
-            wait_interval = 1
+            max_wait = 45  # Increased to 45 seconds for Cloudflare challenge
+            wait_interval = 2  # Check every 2 seconds
             waited = 0
             
             while waited < max_wait:

@@ -92,14 +92,26 @@ class BrowserAutomation:
             # Create options for undetected-chromedriver
             uc_options = uc.ChromeOptions()
             
-            # Apply common arguments
+            # Apply common arguments (skip headless, we'll handle it separately)
             for arg in common_args:
-                if arg not in ['--headless=new']:  # Handle headless separately
+                if 'headless' not in arg.lower():
                     uc_options.add_argument(arg)
             
-            # Handle headless mode
+            # Handle headless mode - but note: Cloudflare detects headless browsers better
+            # Try without headless first, or use --headless=new with more stealth options
             if config.HEADLESS_BROWSER:
+                # Use headless mode with additional stealth options
                 uc_options.add_argument('--headless=new')
+                uc_options.add_argument('--disable-gpu')
+                # Add more stealth options for headless mode
+                uc_options.add_argument('--disable-blink-features=AutomationControlled')
+                uc_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+                uc_options.add_experimental_option('useAutomationExtension', False)
+            else:
+                # In non-headless mode, also add stealth options
+                uc_options.add_argument('--disable-blink-features=AutomationControlled')
+                uc_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+                uc_options.add_experimental_option('useAutomationExtension', False)
             
             # Try to find Chrome binary
             chrome_paths = [
