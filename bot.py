@@ -17,6 +17,13 @@ from database import Database
 from freelancehunt_scraper import FreelancehuntScraper
 from browser_automation import BrowserAutomation
 
+# Start health check server for Render
+try:
+    from health_check import start_health_check_server
+    start_health_check_server(8000)
+except:
+    pass
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
