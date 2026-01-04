@@ -117,8 +117,7 @@ DEV_CATEGORIES = [
     "Joomla",
     "1C-Битрикс",
     
-    # E-commerce
-    "E-commerce",
+    # E-commerce (platforms only, not general category)
     "Magento",
     "PrestaShop",
     "Shopify",
@@ -356,7 +355,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Фреймворки (React, Vue, Angular, Laravel, Django, ASP.NET и др.)
 • Базы данных (MySQL, PostgreSQL, MongoDB, Redis)
 • CMS (WordPress, OpenCart, Drupal, Joomla, 1C-Битрикс)
-• E-commerce (Magento, PrestaShop, Shopify)
+• E-commerce платформы (Magento, PrestaShop, Shopify)
 • DevOps и облачные технологии
 
 Для изменения категорий используйте кнопки ниже.
@@ -718,7 +717,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Фреймворки (React, Vue, Angular, Laravel, Django, ASP.NET и др.)
 • Базы данных (MySQL, PostgreSQL, MongoDB, Redis)
 • CMS (WordPress, OpenCart, Drupal, Joomla, 1C-Битрикс)
-• E-commerce (Magento, PrestaShop, Shopify)
+• E-commerce платформы (Magento, PrestaShop, Shopify)
 • DevOps и облачные технологии
 """
         keyboard = [

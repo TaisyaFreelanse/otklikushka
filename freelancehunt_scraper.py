@@ -679,6 +679,16 @@ class FreelancehuntScraper:
                             'программирование': ['программирование', 'разработка', 'development'],
                         }
                         
+                        # Exclude unwanted categories
+                        excluded_categories = [
+                            'интернет-магазины и электронная коммерция',
+                            'интернет-магазины',
+                            'электронная коммерция',
+                        ]
+                        if any(excluded in project_category.lower() for excluded in excluded_categories):
+                            project_matches_category = False
+                            break
+                        
                         # Check if category matches any variation
                         if cat_lower in category_mappings:
                             for variation in category_mappings[cat_lower]:
