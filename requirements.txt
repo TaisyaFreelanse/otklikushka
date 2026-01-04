@@ -1,0 +1,11 @@
+python-telegram-bot[job-queue]==20.7
+selenium==4.15.0
+beautifulsoup4==4.12.2
+requests==2.31.0
+python-dotenv==1.0.0
+sqlalchemy==2.0.23
+playwright==1.40.0
+aiohttp==3.9.1
+lxml==4.9.3
+webdriver-manager==4.0.1
+

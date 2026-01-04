@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: freelancehunt-bot
+    runtime: docker
+    plan: starter
+    region: oregon
+    buildCommand: ""
+    startCommand: python bot.py
+    envVars:
+      - key: HEADLESS_BROWSER
+        value: "true"
+      - key: BROWSER_TYPE
+        value: "edge"
+      - key: DATABASE_FILE
+        value: "/app/data/freelancehunt_bot.db"
+      - key: COOKIES_FILE
+        value: "/app/data/cookies.json"
+    healthCheckPath: /
+    disk:
+      name: bot-data
+      mountPath: /app/data
+      sizeGB: 1
+
