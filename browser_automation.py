@@ -332,7 +332,14 @@ class BrowserAutomation:
             
             if waited >= max_wait:
                 logger.warning("⚠️ Cloudflare challenge may still be present on base URL")
+                # Continue anyway - sometimes cookies can still be loaded
             
+            # Check cookies file
+            if not self.cookies_path.exists():
+                logger.error(f"Cookies file not found at {self.cookies_path}")
+                return False
+            
+            logger.info(f"Loading cookies from {self.cookies_path}")
             with open(self.cookies_path, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)
                 
