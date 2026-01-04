@@ -346,8 +346,16 @@ async def check_projects_callback(context: ContextTypes.DEFAULT_TYPE):
     try:
         global scraper, browser
         
+        # Initialize browser if needed
+        if browser is None:
+            browser = BrowserAutomation(db)
+        
+        # Initialize scraper with browser
         if scraper is None:
-            scraper = FreelancehuntScraper(db)
+            scraper = FreelancehuntScraper(db, browser=browser)
+        else:
+            # Update browser reference in case it was recreated
+            scraper.browser = browser
         
         categories = db.get_categories()
         

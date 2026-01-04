@@ -2,13 +2,12 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
 import time
 import logging
 import config
-from database import Database
 from database import Database
 
 logger = logging.getLogger(__name__)
@@ -17,10 +16,11 @@ logger = logging.getLogger(__name__)
 class FreelancehuntScraper:
     """Scraper for Freelancehunt projects page."""
     
-    def __init__(self, db: Database, session: requests.Session = None):
-        """Initialize scraper with database and session."""
+    def __init__(self, db: Database, session: requests.Session = None, browser=None):
+        """Initialize scraper with database, session, and optional browser."""
         self.db = db
         self.session = session or requests.Session()
+        self.browser = browser  # BrowserAutomation instance
         self.base_url = config.FREELANCEHUNT_URL
         self.projects_url = urljoin(self.base_url, "/projects")
         
@@ -131,51 +131,87 @@ class FreelancehuntScraper:
     def parse_project_card(self, card_element) -> Optional[Dict]:
         """Parse a single project card element."""
         try:
-            # Find project link
+            # Find project link - try multiple ways
             link_elem = card_element.find('a', href=re.compile(r'/project/'))
+            if not link_elem:
+                # Try finding any link with project in href
+                all_links = card_element.find_all('a', href=True)
+                for link in all_links:
+                    if '/project/' in link.get('href', ''):
+                        link_elem = link
+                        break
+            
             if not link_elem:
                 return None
             
-            project_url = urljoin(self.base_url, link_elem.get('href', ''))
+            href = link_elem.get('href', '')
+            project_url = urljoin(self.base_url, href)
             project_id = self.extract_project_id(project_url)
             
             if not project_id:
                 return None
             
-            # Extract title
+            # Extract title - try multiple sources
             title = link_elem.get_text(strip=True)
             if not title:
                 title = link_elem.get('title', '').strip()
+            if not title:
+                # Try finding title in parent or siblings
+                parent = link_elem.find_parent(['td', 'div', 'span'])
+                if parent:
+                    title_elem = parent.find(['h1', 'h2', 'h3', 'h4', 'strong', 'b'])
+                    if title_elem:
+                        title = title_elem.get_text(strip=True)
             
-            # Extract category
+            if not title:
+                # Last resort: use URL slug
+                title = href.split('/')[-2] if len(href.split('/')) > 2 else "Без названия"
+            
+            # Extract category - look in various places
             category = None
-            category_elem = card_element.find(['span', 'div'], class_=re.compile(r'category|tag|badge', re.I))
+            # Try to find category in the card
+            category_elem = card_element.find(['span', 'div', 'td'], class_=re.compile(r'category|tag|badge|label', re.I))
             if category_elem:
                 category = category_elem.get_text(strip=True)
             
-            # Extract budget
+            # If not found, try looking for text that looks like a category
+            if not category:
+                text_content = card_element.get_text(' ', strip=True)
+                # Common category patterns
+                category_match = re.search(r'(Программирование|Разработка|Дизайн|Маркетинг|Текст|Перевод)', text_content, re.I)
+                if category_match:
+                    category = category_match.group(1)
+            
+            # Extract budget - look for UAH or currency symbols
             budget = None
-            budget_elem = card_element.find(string=re.compile(r'UAH|грн|₴|\d+\s*\$', re.I))
-            if budget_elem:
-                budget_text = budget_elem if isinstance(budget_elem, str) else budget_elem.get_text()
+            # Search in the entire card text
+            card_text = card_element.get_text(' ', strip=True)
+            budget_match = re.search(r'(\d+(?:\s*\d+)*)\s*(?:UAH|грн|₴)', card_text, re.I)
+            if budget_match:
+                budget_text = budget_match.group(1).replace(' ', '')
                 budget = self.parse_budget(budget_text)
             
-            # Extract deadline if mentioned in preview
+            # Extract deadline
             deadline = None
-            deadline_elem = card_element.find(string=re.compile(r'дн|день|дней|срок', re.I))
-            if deadline_elem:
-                deadline_text = deadline_elem if isinstance(deadline_elem, str) else deadline_elem.get_text()
-                deadline = self.parse_deadline(deadline_text)
+            deadline_match = re.search(r'(\d+)\s*(?:дн|день|дней|day|days)', card_text, re.I)
+            if deadline_match:
+                deadline = int(deadline_match.group(1))
             
-            # Extract creation time if available
+            # Extract creation time
             created_at = None
-            time_elem = card_element.find(['time', 'span'], class_=re.compile(r'time|date|created', re.I))
+            time_elem = card_element.find(['time', 'span', 'td'], class_=re.compile(r'time|date|created|ago', re.I))
             if time_elem:
                 datetime_attr = time_elem.get('datetime')
                 if datetime_attr:
                     created_at = datetime_attr
                 else:
                     created_at = time_elem.get_text(strip=True)
+            
+            # If no time found, try to parse relative time from text
+            if not created_at:
+                time_match = re.search(r'(\d+)\s*(?:мин|час|час|день|минут|часов|дней)\s*(?:назад|ago)', card_text, re.I)
+                if time_match:
+                    created_at = datetime.now().isoformat()
             
             return {
                 'id': project_id,
@@ -187,46 +223,111 @@ class FreelancehuntScraper:
                 'created_at': created_at or datetime.now().isoformat()
             }
         except Exception as e:
-            print(f"Error parsing project card: {e}")
+            logger.error(f"Error parsing project card: {e}")
+            return None
+    
+    def get_html_via_browser(self, page: int = 1, load_cookies: bool = True) -> Optional[str]:
+        """Get HTML content using browser automation."""
+        if not self.browser:
+            return None
+        
+        try:
+            # Initialize browser if needed
+            is_new_browser = False
+            if not self.browser.driver:
+                self.browser.driver = self.browser.init_driver()
+                is_new_browser = True
+            
+            # Load cookies only if browser is new or explicitly requested
+            if is_new_browser or load_cookies:
+                self.browser.load_cookies()
+            
+            # Navigate to projects page (with page parameter if needed)
+            url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
+            self.browser.driver.get(url)
+            time.sleep(3)  # Wait for page to load
+            
+            # Get page HTML
+            html = self.browser.driver.page_source
+            return html
+        except Exception as e:
+            logger.error(f"Error getting HTML via browser (page {page}): {e}")
             return None
     
     def get_new_projects(self, categories: List[str] = None) -> List[Dict]:
         """Get new projects from Freelancehunt."""
-        self.load_cookies()
+        all_project_cards = []
+        
+        # Check first 2 pages (newest projects are usually on first pages)
+        for page_num, page in enumerate([1, 2], 1):
+            html_content = None
+            
+            # Try to get HTML via browser first (more reliable)
+            if self.browser:
+                logger.info(f"Using browser to fetch projects page {page}...")
+                # Load cookies only on first page
+                html_content = self.get_html_via_browser(page, load_cookies=(page_num == 1))
+            
+            # Fallback to requests if browser fails or not available
+            if not html_content:
+                logger.info(f"Falling back to requests for fetching projects page {page}...")
+                self.load_cookies()
+                try:
+                    url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
+                    response = self.session.get(url, timeout=30)
+                    response.raise_for_status()
+                    html_content = response.text
+                except requests.RequestException as e:
+                    logger.error(f"Error fetching projects via requests (page {page}): {e}")
+                    continue
+            
+            if not html_content:
+                logger.warning(f"Failed to get HTML content for page {page}")
+                continue
+            
+            try:
+                soup = BeautifulSoup(html_content, 'lxml')
+                
+                # Find all project cards - try multiple selectors for better results
+                project_cards = []
+                
+                # Try various selectors to find project cards
+                selectors_to_try = [
+                    # Table structure (most common)
+                    soup.select('table.table-projects tbody tr'),
+                    soup.select('tbody tr'),
+                    # Table rows with project links
+                    soup.find_all('tr', class_=re.compile(r'project|item', re.I)),
+                    # Look for any row containing project links
+                    [tr for tr in soup.find_all('tr') if tr.find('a', href=re.compile(r'/project/'))],
+                    # Alternative structures
+                    soup.find_all('article', class_=re.compile(r'project|card', re.I)),
+                    soup.find_all('div', class_=re.compile(r'project|card', re.I)),
+                    soup.select('.project-item, .card-project, [class*="project"]'),
+                ]
+                
+                for selector_result in selectors_to_try:
+                    if selector_result:
+                        project_cards = selector_result
+                        logger.info(f"Found {len(project_cards)} project cards on page {page} using selector")
+                        break
+                
+                all_project_cards.extend(project_cards)
+                
+            except Exception as e:
+                logger.error(f"Error parsing projects page {page}: {e}")
+                continue
+        
+        if not all_project_cards:
+            logger.warning("No project cards found on any page")
+            return []
         
         try:
-            response = self.session.get(self.projects_url, timeout=30)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.text, 'lxml')
-            
-            # Find all project cards - try multiple selectors for better results
-            project_cards = []
-            
-            # Try various selectors to find project cards
-            selectors_to_try = [
-                # Modern structure
-                soup.select('table.table-projects tbody tr'),
-                soup.select('tbody tr[data-project-id]'),
-                soup.find_all('tr', class_=re.compile(r'project|item', re.I)),
-                # Generic table rows in projects table
-                soup.select('table tbody tr'),
-                # Alternative structures
-                soup.find_all('article', class_=re.compile(r'project|card', re.I)),
-                soup.find_all('div', class_=re.compile(r'project|card', re.I)),
-                soup.select('.project-item, .card-project, [class*="project"]'),
-            ]
-            
-            for selector_result in selectors_to_try:
-                if selector_result:
-                    project_cards = selector_result
-                    logger.info(f"Found {len(project_cards)} project cards using selector")
-                    break
             
             # Remove duplicates while preserving order
             seen_ids = set()
             unique_cards = []
-            for card in project_cards:
+            for card in all_project_cards:
                 # Try to get a unique identifier for the card
                 card_id = None
                 try:
@@ -271,13 +372,28 @@ class FreelancehuntScraper:
                 if categories and len(categories) > 0:
                     # Only filter if categories are specified
                     project_matches_category = False
-                    if project.get('category'):
-                        # Check if project category matches any of our categories
-                        project_category = project['category'].lower()
-                        project_matches_category = any(
-                            cat.lower() in project_category or project_category in cat.lower()
-                            for cat in categories if cat
-                        )
+                    
+                    # Build search text from title, category, and description (if available)
+                    search_text = (project.get('title', '') + ' ' + 
+                                 (project.get('category', '') or '')).lower()
+                    
+                    # Check if any category keyword matches
+                    for cat in categories:
+                        if not cat:
+                            continue
+                        cat_lower = cat.lower()
+                        # Check in category field
+                        if project.get('category') and cat_lower in project['category'].lower():
+                            project_matches_category = True
+                            break
+                        # Check in title/description (broader matching)
+                        if cat_lower in search_text or any(
+                            keyword in search_text 
+                            for keyword in cat_lower.split()
+                            if len(keyword) > 2
+                        ):
+                            project_matches_category = True
+                            break
                 
                 # If project matches category or no categories specified, add to main projects
                 if project_matches_category:
@@ -321,10 +437,7 @@ class FreelancehuntScraper:
             
             return new_projects
             
-        except requests.RequestException as e:
-            print(f"Error fetching projects: {e}")
-            return []
         except Exception as e:
-            print(f"Error parsing projects: {e}")
+            logger.error(f"Error parsing projects: {e}")
             return []
 
