@@ -308,8 +308,15 @@ class FreelancehuntScraper:
                 self.browser.driver = self.browser.init_driver()
                 is_new_browser = True
             
-            # Load cookies only if browser is new or explicitly requested
-            if is_new_browser or load_cookies:
+            # Load cookies only if browser is NEW (not if driver already exists with cookies)
+            # This avoids reloading cookies on every page request, which breaks Cloudflare session
+            if is_new_browser:
+                logger.info("New browser instance detected, loading cookies...")
+                if not self.browser.load_cookies():
+                    logger.warning("⚠️ Failed to load cookies for new browser instance")
+            elif load_cookies:
+                # Only reload if explicitly requested (should be rare)
+                logger.debug("Explicit cookie reload requested")
                 self.browser.load_cookies()
             
             # Navigate to projects page (with page parameter if needed)

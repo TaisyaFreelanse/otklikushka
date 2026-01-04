@@ -346,9 +346,20 @@ async def check_projects_callback(context: ContextTypes.DEFAULT_TYPE):
     try:
         global scraper, browser
         
-        # Initialize browser if needed
+        # Initialize browser if needed (reuse same instance to maintain session)
         if browser is None:
             browser = BrowserAutomation(db)
+            logger.info("Initializing browser for first time...")
+        
+        # Initialize driver if not already done (reuse to maintain session and cookies)
+        if browser.driver is None:
+            logger.info("Initializing browser driver...")
+            browser.driver = browser.init_driver()
+            # Load cookies once on first initialization
+            if browser.load_cookies():
+                logger.info("✅ Cookies loaded successfully on browser initialization")
+            else:
+                logger.warning("⚠️ Failed to load cookies on browser initialization")
         
         # Initialize scraper with browser
         if scraper is None:
