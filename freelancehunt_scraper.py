@@ -638,6 +638,24 @@ class FreelancehuntScraper:
                         
                         # Special mappings for common variations
                         category_mappings = {
+                            'веб-программирование': ['веб-программирование', 'web development', 'веб-разработка'],
+                            'веб-разработка': ['веб-разработка', 'веб-программирование', 'web development'],
+                            'backend': ['бэкенд', 'backend', 'back-end', 'бэк-энд'],
+                            'frontend': ['фронтенд', 'frontend', 'front-end', 'фронт-энд'],
+                            'программирование': ['программирование', 'разработка', 'development'],
+                        }
+                        
+                        # Check if category matches any variation
+                        if cat_lower in category_mappings:
+                            for variation in category_mappings[cat_lower]:
+                                if variation in project_category or variation in search_text:
+                                    project_matches_category = True
+                                    break
+                            if project_matches_category:
+                                break
+                        
+                        # Special mappings for common variations
+                        category_mappings = {
                             'веб-программирование': ['веб-программирование', 'web development', 'web development', 'веб-разработка'],
                             'веб-разработка': ['веб-разработка', 'веб-программирование', 'web development'],
                             'backend': ['бэкенд', 'backend', 'back-end', 'бэк-энд'],
