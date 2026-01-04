@@ -94,21 +94,36 @@ class BrowserAutomation:
             # It handles stealth options internally and they conflict.
             uc_options = uc.ChromeOptions()
             
-            # Apply common arguments (skip headless for now - Cloudflare detects headless)
+            # Use persistent profile directory to maintain session between restarts
+            profile_dir = str(config.DATA_DIR / "chrome_profile")
+            os.makedirs(profile_dir, exist_ok=True)
+            uc_options.user_data_dir = profile_dir
+            logger.info(f"Using Chrome profile directory: {profile_dir}")
+            
+            # Apply common arguments (skip headless and automation-related - UC handles these)
             for arg in common_args:
-                # Skip headless and automation-related args - UC handles these
+                # Skip headless and automation-related args - UC handles these internally
                 if 'headless' not in arg.lower() and 'AutomationControlled' not in arg:
                     uc_options.add_argument(arg)
             
-            # For Cloudflare bypass, we need to try headless=new mode
-            # but if that doesn't work, try without headless
-            # NOTE: Cloudflare is very good at detecting headless browsers
-            if config.HEADLESS_BROWSER:
+            # IMPORTANT: Do NOT use headless mode - Cloudflare detects it easily
+            # Even with Xvfb, we need to make sure headless is OFF
+            # Check if we have DISPLAY available (from Xvfb)
+            display_available = os.environ.get('DISPLAY') is not None
+            logger.info(f"DISPLAY environment variable: {os.environ.get('DISPLAY', 'NOT SET')}")
+            
+            if config.HEADLESS_BROWSER and not display_available:
+                # Only use headless if DISPLAY is not available (fallback)
+                logger.warning("Using headless mode as fallback (DISPLAY not available)")
                 uc_options.add_argument('--headless=new')
                 uc_options.add_argument('--disable-gpu')
+            else:
+                # Non-headless mode - better for Cloudflare bypass
+                logger.info("Using non-headless mode (better for Cloudflare bypass)")
             
-            # Add window size for headless mode (important for some sites)
+            # Add window size (important for proper rendering)
             uc_options.add_argument('--window-size=1920,1080')
+            uc_options.add_argument('--start-maximized')
             
             # Try to find Chrome binary
             chrome_paths = [
@@ -124,11 +139,26 @@ class BrowserAutomation:
                     logger.info(f"Found Chrome binary at: {path}")
                     break
             
-            # Initialize undetected-chromedriver
-            if chrome_binary:
-                driver = uc.Chrome(options=uc_options, browser_executable_path=chrome_binary, use_subprocess=False)
-            else:
-                driver = uc.Chrome(options=uc_options, use_subprocess=False)
+            # Initialize undetected-chromedriver with version_main for stability
+            try:
+                if chrome_binary:
+                    driver = uc.Chrome(
+                        options=uc_options,
+                        browser_executable_path=chrome_binary,
+                        use_subprocess=False,
+                        version_main=None,  # Auto-detect version
+                        no_sandbox=True  # Required for Docker/containers
+                    )
+                else:
+                    driver = uc.Chrome(
+                        options=uc_options,
+                        use_subprocess=False,
+                        version_main=None,
+                        no_sandbox=True
+                    )
+            except Exception as e:
+                logger.error(f"Error initializing undetected-chromedriver: {e}")
+                raise
             
             logger.info("Successfully initialized Chrome with undetected-chromedriver")
             return driver
