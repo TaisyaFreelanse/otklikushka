@@ -45,8 +45,6 @@ COOKIES_PATH = DATA_DIR / COOKIES_FILE
 DATABASE_PATH = DATA_DIR / DATABASE_FILE
 
 # Browser Configuration
-# Default to headless=true for local testing without opening browser window
-# Set HEADLESS_BROWSER=false in .env or environment to see browser window
 HEADLESS_BROWSER = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
 BROWSER_TYPE = os.getenv("BROWSER_TYPE", "chrome")  # chrome or edge (chrome works better on Linux servers)
 

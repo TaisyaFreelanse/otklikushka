@@ -221,10 +221,30 @@ class FreelancehuntScraper:
             # If still not found, try looking for common category patterns in text
             if not category:
                 text_content = card_element.get_text(' ', strip=True)
-                # Match common category names
-                category_match = re.search(r'(Программирование|Разработка|Дизайн|Маркетинг|Текст|Перевод|Веб-программирование)', text_content, re.I)
-                if category_match:
-                    category = category_match.group(1)
+                # Match common category names (expanded list)
+                category_patterns = [
+                    r'Программирование',
+                    r'Веб-программирование',
+                    r'Веб-разработка',
+                    r'Разработка',
+                    r'Дизайн',
+                    r'Маркетинг',
+                    r'Текст',
+                    r'Перевод',
+                    r'Backend',
+                    r'Frontend',
+                    r'Full Stack',
+                    r'Мобильная разработка',
+                    r'iOS',
+                    r'Android',
+                    r'Web Development',
+                    r'Mobile Development',
+                ]
+                for pattern in category_patterns:
+                    category_match = re.search(pattern, text_content, re.I)
+                    if category_match:
+                        category = category_match.group(0)
+                        break
             
             # Extract budget - look for UAH or currency symbols
             budget = None
@@ -567,14 +587,22 @@ class FreelancehuntScraper:
                                  (project.get('category', '') or '')).lower()
                     
                     # Check if any category keyword matches
+                    project_category = (project.get('category') or '').lower()
+                    
                     for cat in categories:
                         if not cat:
                             continue
                         cat_lower = cat.lower()
-                        # Check in category field
-                        if project.get('category') and cat_lower in project['category'].lower():
+                        
+                        # Direct category match (exact or contains)
+                        if project_category and (
+                            cat_lower in project_category or 
+                            project_category in cat_lower or
+                            any(word in project_category for word in cat_lower.split() if len(word) > 3)
+                        ):
                             project_matches_category = True
                             break
+                        
                         # Check in title/description (broader matching)
                         if cat_lower in search_text or any(
                             keyword in search_text 
@@ -583,6 +611,24 @@ class FreelancehuntScraper:
                         ):
                             project_matches_category = True
                             break
+                        
+                        # Special mappings for common variations
+                        category_mappings = {
+                            'веб-программирование': ['веб-программирование', 'web development', 'web development', 'веб-разработка'],
+                            'веб-разработка': ['веб-разработка', 'веб-программирование', 'web development'],
+                            'backend': ['бэкенд', 'backend', 'back-end', 'бэк-энд'],
+                            'frontend': ['фронтенд', 'frontend', 'front-end', 'фронт-энд'],
+                            'программирование': ['программирование', 'разработка', 'development'],
+                        }
+                        
+                        # Check if category matches any variation
+                        if cat_lower in category_mappings:
+                            for variation in category_mappings[cat_lower]:
+                                if variation in project_category or variation in search_text:
+                                    project_matches_category = True
+                                    break
+                            if project_matches_category:
+                                break
                 
                 # If project matches category or no categories specified, add to main projects
                 if project_matches_category:

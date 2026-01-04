@@ -43,6 +43,7 @@ bot_application = None
 DEV_CATEGORIES = [
     "Программирование",
     "Веб-разработка",
+    "Веб-программирование",  # Добавлено для распознавания
     "PHP",
     "JavaScript",
     "Python",
@@ -375,54 +376,13 @@ async def check_projects_callback(context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"Found {len(new_projects)} new projects")
         
-        # Get new other projects (outside categories)
+        # Get new other projects (outside categories) - just save them, no notifications
         new_other_projects = db.get_new_other_projects()
         if new_other_projects:
-            logger.info(f"Found {len(new_other_projects)} new projects outside categories")
-            
-            # Send notification about other projects
-            try:
-                for other_project in new_other_projects[:5]:  # Limit to 5 notifications
-                    created_at = datetime.fromisoformat(other_project['first_seen_at']) if other_project.get('first_seen_at') else None
-                    if created_at:
-                        now = datetime.now()
-                        if created_at.tzinfo:
-                            now = now.replace(tzinfo=created_at.tzinfo)
-                        diff = now - created_at
-                        if diff.days == 0:
-                            time_str = f"сегодня {created_at.strftime('%H:%M')}"
-                        elif diff.days == 1:
-                            time_str = f"вчера {created_at.strftime('%H:%M')}"
-                        else:
-                            time_str = created_at.strftime("%d.%m %H:%M")
-                    else:
-                        time_str = "?"
-                    
-                    title = other_project['title'][:50] + "..." if len(other_project['title']) > 50 else other_project['title']
-                    budget_text = f"💰 {other_project['budget']:.0f} грн | " if other_project.get('budget') else ""
-                    
-                    notification = f"""
-🔍 <b>Новый проект вне категорий</b>
-
-📝 <b>{title}</b>
-{budget_text}📁 {other_project.get('category', 'Без категории')}
-🕐 {time_str}
-🔗 <a href="{other_project['url']}">Проект</a>
-
-<i>Этот проект не попал в ваши категории</i>
-"""
-                    await context.bot.send_message(
-                        chat_id=context.job.chat_id,
-                        text=notification,
-                        parse_mode=ParseMode.HTML,
-                        disable_web_page_preview=True
-                    )
-                    
-                    # Mark as notified
-                    db.mark_other_project_notified(other_project['id'])
-                    await asyncio.sleep(1)  # Small delay between notifications
-            except Exception as e:
-                logger.error(f"Error sending other projects notifications: {e}")
+            logger.info(f"Found {len(new_other_projects)} new projects outside categories (saved, no notifications)")
+            # Mark as notified immediately so they don't trigger notifications
+            for other_project in new_other_projects:
+                db.mark_other_project_notified(other_project['id'])
         
         if not new_projects:
             return
