@@ -41,11 +41,16 @@ bot_application = None
 
 # Development categories for Freelancehunt
 DEV_CATEGORIES = [
+    # Основные категории программирования
     "Программирование",
     "Веб-разработка",
-    "Веб-программирование",  # Добавлено для распознавания
+    "Веб-программирование",
+    
+    # Языки программирования
     "PHP",
     "JavaScript",
+    "Javascript и Typescript",
+    "TypeScript",
     "Python",
     "Java",
     "C#",
@@ -56,50 +61,84 @@ DEV_CATEGORIES = [
     "Kotlin",
     "Swift",
     "Dart",
-    "TypeScript",
     "Node.js",
+    
+    # Веб-технологии
+    "HTML и CSS верстка",
+    "HTML/CSS",
+    "Sass/SCSS",
+    "Bootstrap",
+    "Tailwind CSS",
     "React",
     "Vue.js",
     "Angular",
+    
+    # Backend фреймворки
     "Laravel",
     "Django",
     "Flask",
     "ASP.NET",
     "Spring",
     "Symfony",
+    
+    # Мобильная разработка
     "Мобильная разработка",
+    "Разработка под iOS (iPhone и iPad)",
     "iOS разработка",
+    "Разработка под Android",
     "Android разработка",
+    "Гибридные мобильные приложения",
     "React Native",
     "Flutter",
     "Xamarin",
+    
+    # Специализации
     "Бэкенд разработка",
     "Frontend разработка",
     "Full Stack разработка",
     "API разработка",
     "REST API",
     "GraphQL",
+    "Десктопные приложения",
+    
+    # Базы данных
+    "Базы данных и SQL",
     "Базы данных",
     "MySQL",
     "PostgreSQL",
     "MongoDB",
     "Redis",
+    
+    # CMS
     "CMS",
     "WordPress",
     "OpenCart",
     "Drupal",
     "Joomla",
     "1C-Битрикс",
+    
+    # E-commerce
     "E-commerce",
     "Magento",
     "PrestaShop",
     "Shopify",
+    
+    # Дополнительные категории из скриншотов
+    "AI и машинное обучение",
+    "AR и VR разработка",
+    "Криптовалюта и blockchain",
+    "Парсинг данных",
+    "Разработка ботов",
+    "Разработка игр",
+    "Тестирование и QA",
+    
+    # Дизайн (если нужен)
     "Веб-дизайн",
     "UI/UX дизайн",
-    "HTML/CSS",
-    "Sass/SCSS",
-    "Bootstrap",
-    "Tailwind CSS",
+    "3D моделирование и визуализация",
+    "Векторная графика",
+    
+    # DevOps
     "DevOps",
     "Docker",
     "Kubernetes",

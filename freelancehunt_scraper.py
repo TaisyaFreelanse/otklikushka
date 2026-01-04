@@ -210,11 +210,26 @@ class FreelancehuntScraper:
                 # Get text from category links
                 categories = [link.get_text(strip=True) for link in category_links if link.get_text(strip=True)]
                 if categories:
-                    # Join multiple categories
-                    category = ', '.join(categories[:2])  # Limit to 2 categories
-            else:
-                # Fallback: try to find category in other elements
-                category_elem = card_element.find(['span', 'div', 'td'], class_=re.compile(r'category|tag|badge|label', re.I))
+                    # Join multiple categories (up to 3 for better matching)
+                    category = ', '.join(categories[:3])
+            
+            # Also check for category text pattern like "3D моделирование и визуализация, Векторная графика"
+            # This pattern appears after the title, before time
+            if not category:
+                # Look for text pattern: "Category1, Category2 - X минут назад"
+                category_time_pattern = re.search(
+                    r'([А-Яа-яA-Za-z\s]+(?:,\s*[А-Яа-яA-Za-z\s]+)*)\s*-\s*\d+\s*(?:минут|час|день|дней)',
+                    card_text,
+                    re.I
+                )
+                if category_time_pattern:
+                    category = category_time_pattern.group(1).strip()
+                    # Clean up - remove trailing dashes or extra spaces
+                    category = re.sub(r'\s*-\s*$', '', category).strip()
+            
+            # Fallback: try to find category in other elements
+            if not category:
+                category_elem = card_element.find(['span', 'div', 'td'], class_=re.compile(r'category|tag|badge|label|skill', re.I))
                 if category_elem:
                     category = category_elem.get_text(strip=True)
             
@@ -239,6 +254,11 @@ class FreelancehuntScraper:
                     r'Android',
                     r'Web Development',
                     r'Mobile Development',
+                    r'3D моделирование',
+                    r'Векторная графика',
+                    r'AI и машинное обучение',
+                    r'Разработка ботов',
+                    r'Парсинг данных',
                 ]
                 for pattern in category_patterns:
                     category_match = re.search(pattern, text_content, re.I)
@@ -273,7 +293,13 @@ class FreelancehuntScraper:
             created_at_datetime = datetime.now()
             
             # Look for relative time patterns: "X минут назад", "X часов Y минут назад", etc.
+            # Pattern matches: "Category1, Category2 - X минут назад" or just "X минут назад"
             time_patterns = [
+                # Pattern with category prefix: "Category - X минут назад"
+                r'-\s*(\d+)\s*минут\s*назад',  # "- 21 минута назад" (after category)
+                r'-\s*(\d+)\s*час(?:а|ов)?\s*назад',  # "- 2 часа назад"
+                r'-\s*(\d+)\s*д(?:ень|ня|ней)\s*назад',  # "- 1 день назад"
+                # Direct patterns without prefix
                 r'(\d+)\s*час(?:а|ов)?\s*(\d+)\s*минут\s*назад',  # "2 часа 17 минут назад"
                 r'(\d+)\s*минут\s*назад',  # "26 минут назад"
                 r'(\d+)\s*час(?:а|ов)?\s*назад',  # "2 часа назад"
@@ -284,10 +310,15 @@ class FreelancehuntScraper:
             for pattern in time_patterns:
                 time_match = re.search(pattern, card_text, re.I)
                 if time_match:
-                    # Get the full match
+                    # Get the full match (with or without dash prefix)
                     time_text = time_match.group(0)
+                    # Remove leading dash and spaces if present
+                    time_text = re.sub(r'^-\s*', '', time_text).strip()
+                    
+                    # Parse relative time
                     created_at_datetime = self.parse_relative_time(time_text)
                     created_at = created_at_datetime.isoformat()
+                    logger.debug(f"Parsed time '{time_text}' -> {created_at}")
                     break
             
             # Fallback: try to find time element with datetime attribute
