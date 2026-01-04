@@ -270,9 +270,32 @@ class BrowserAutomation:
         
         try:
             self.driver.get(self.base_url)
-            # Wait for Cloudflare challenge to complete (can take 15-30 seconds)
+            # Wait for Cloudflare challenge to complete (can take 20-40 seconds)
             logger.info("Waiting for Cloudflare challenge to complete after loading base URL...")
-            time.sleep(15)  # Increased wait time for Cloudflare
+            
+            # Wait and check for Cloudflare with user interaction simulation
+            max_wait = 40
+            waited = 0
+            while waited < max_wait:
+                page_source = self.driver.page_source
+                if "Just a moment" in page_source or "cf-browser-verification" in page_source:
+                    if waited % 10 == 0:
+                        logger.info(f"Cloudflare challenge on base URL, waiting... ({waited}s/{max_wait}s)")
+                    # Try to interact with page to help Cloudflare verify
+                    try:
+                        self.driver.execute_script("window.scrollTo(0, 100);")
+                        time.sleep(1)
+                        self.driver.execute_script("window.scrollTo(0, 0);")
+                    except:
+                        pass
+                    time.sleep(3)
+                    waited += 3
+                else:
+                    logger.info(f"✅ Base URL loaded successfully after {waited}s - Cloudflare passed!")
+                    break
+            
+            if waited >= max_wait:
+                logger.warning("⚠️ Cloudflare challenge may still be present on base URL")
             
             with open(self.cookies_path, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)

@@ -58,7 +58,7 @@ ENV DISPLAY=:99
 EXPOSE 8000
 
 # Create startup script that runs Xvfb and bot
-RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1920x1080x24 &\nsleep 2\npython bot.py' > /app/start.sh && chmod +x /app/start.sh
+RUN echo '#!/bin/bash\nrm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true\npkill -f Xvfb 2>/dev/null || true\nsleep 1\nXvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &\nexport DISPLAY=:99\nsleep 3\npython bot.py' > /app/start.sh && chmod +x /app/start.sh
 
 # Run with Xvfb for non-headless mode
 CMD ["/bin/bash", "/app/start.sh"]

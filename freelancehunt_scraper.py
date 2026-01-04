@@ -316,30 +316,43 @@ class FreelancehuntScraper:
             url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
             self.browser.driver.get(url)
             
-            # Wait for Cloudflare challenge to complete (can take up to 30-45 seconds)
+            # Wait for Cloudflare challenge to complete (can take up to 60-90 seconds)
             logger.info(f"Waiting for page {page} to load (Cloudflare challenge may appear)...")
-            max_wait = 45  # Increased to 45 seconds for Cloudflare challenge
-            wait_interval = 2  # Check every 2 seconds
+            max_wait = 90  # Increased to 90 seconds for Cloudflare challenge
+            wait_interval = 3  # Check every 3 seconds
             waited = 0
             
             while waited < max_wait:
                 html = self.browser.driver.page_source
                 # Check if Cloudflare challenge is still present
                 if "Just a moment" in html or "cf-browser-verification" in html or "challenge-platform" in html:
-                    logger.debug(f"Cloudflare challenge detected, waiting... ({waited}s/{max_wait}s)")
+                    if waited % 15 == 0:  # Log every 15 seconds
+                        logger.info(f"Cloudflare challenge detected, waiting... ({waited}s/{max_wait}s)")
+                    
+                    # Try to interact with page to help Cloudflare verify (simulate human behavior)
+                    try:
+                        # Scroll a bit
+                        self.browser.driver.execute_script("window.scrollTo(0, Math.floor(Math.random() * 100) + 50);")
+                        time.sleep(0.5)
+                        # Move mouse cursor (even though headless, some sites check this)
+                        self.browser.driver.execute_script("document.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, cancelable: true, view: window}));")
+                        time.sleep(0.5)
+                    except Exception as e:
+                        logger.debug(f"Error simulating interaction: {e}")
+                    
                     time.sleep(wait_interval)
                     waited += wait_interval
                 else:
                     # Page loaded successfully
-                    logger.info(f"Page {page} loaded successfully after {waited}s")
+                    logger.info(f"✅ Page {page} loaded successfully after {waited}s - Cloudflare passed!")
                     break
             
             # Final check - if still Cloudflare, log warning but return HTML anyway
             final_html = self.browser.driver.page_source
             if "Just a moment" in final_html or "cf-browser-verification" in final_html:
-                logger.warning(f"Cloudflare challenge still present on page {page} after {max_wait}s wait")
+                logger.warning(f"⚠️ Cloudflare challenge still present on page {page} after {max_wait}s wait")
             else:
-                logger.info(f"Page {page} appears to be fully loaded")
+                logger.info(f"✅ Page {page} appears to be fully loaded")
             
             return final_html
         except Exception as e:
