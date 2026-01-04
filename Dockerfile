@@ -50,8 +50,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create directory for cookies and database
-RUN mkdir -p /app/data && chmod 777 /app/data
+# Create directory for cookies and database (will be mounted on Render)
+RUN mkdir -p /app/data || true
 
 # Set environment variables for headless mode
 ENV HEADLESS_BROWSER=true
