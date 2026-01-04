@@ -103,26 +103,38 @@ class BrowserAutomation:
                 service = ChromeService(executable_path=driver_path)
                 driver = webdriver.Chrome(service=service, options=chrome_options)
             except Exception:
-                # Method 3: Try system chrome/chromium
+                # Method 3: Try system chrome/chromium with explicit binary location
                 try:
-                    # Try common paths
+                    # Try common paths for Chrome
                     chrome_paths = [
+                        '/usr/bin/google-chrome-stable',
                         '/usr/bin/google-chrome',
                         '/usr/bin/chromium',
                         '/usr/bin/chromium-browser',
+                        '/opt/google/chrome/google-chrome',  # Alternative location
                     ]
                     chrome_binary = None
                     for path in chrome_paths:
                         if os.path.exists(path):
                             chrome_binary = path
+                            logger.info(f"Found Chrome binary at: {path}")
                             break
                     
                     if chrome_binary:
                         chrome_options.binary_location = chrome_binary
-                        driver = webdriver.Chrome(options=chrome_options)
+                        # Try with webdriver-manager again but with binary location set
+                        try:
+                            from webdriver_manager.chrome import ChromeDriverManager
+                            driver_path = ChromeDriverManager().install()
+                            service = ChromeService(executable_path=driver_path)
+                            driver = webdriver.Chrome(service=service, options=chrome_options)
+                        except:
+                            # Last resort: try without service
+                            driver = webdriver.Chrome(options=chrome_options)
                     else:
-                        raise Exception("Chrome binary not found")
+                        raise Exception("Chrome binary not found in common paths")
                 except Exception as e:
+                    logger.error(f"Chrome initialization failed: {e}")
                     raise Exception(f"Не удалось инициализировать ChromeDriver: {e}")
         
         # Remove webdriver property
