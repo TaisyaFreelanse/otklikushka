@@ -106,20 +106,26 @@ class BrowserAutomation:
                 if 'headless' not in arg.lower() and 'AutomationControlled' not in arg:
                     uc_options.add_argument(arg)
             
-            # IMPORTANT: Do NOT use headless mode - Cloudflare detects it easily
-            # Even with Xvfb, we need to make sure headless is OFF
+            # IMPORTANT: Always use NON-HEADLESS mode when DISPLAY is available
+            # Cloudflare easily detects headless browsers, even with stealth patches
             # Check if we have DISPLAY available (from Xvfb)
             display_available = os.environ.get('DISPLAY') is not None
-            logger.info(f"DISPLAY environment variable: {os.environ.get('DISPLAY', 'NOT SET')}")
+            display_value = os.environ.get('DISPLAY', 'NOT SET')
+            logger.info(f"DISPLAY environment variable: {display_value}")
             
-            if config.HEADLESS_BROWSER and not display_available:
-                # Only use headless if DISPLAY is not available (fallback)
-                logger.warning("Using headless mode as fallback (DISPLAY not available)")
+            # Force non-headless mode if DISPLAY is available (which it should be with Xvfb)
+            if display_available:
+                # Non-headless mode - REQUIRED for Cloudflare bypass
+                logger.info("✅ Using non-headless mode (DISPLAY available) - better for Cloudflare bypass")
+                # DO NOT add --headless argument - this is critical!
+            elif config.HEADLESS_BROWSER:
+                # Only use headless as absolute last resort
+                logger.warning("⚠️ Using headless mode as fallback (DISPLAY not available) - Cloudflare may block!")
                 uc_options.add_argument('--headless=new')
                 uc_options.add_argument('--disable-gpu')
             else:
-                # Non-headless mode - better for Cloudflare bypass
-                logger.info("Using non-headless mode (better for Cloudflare bypass)")
+                # Non-headless even without DISPLAY (may fail but worth trying)
+                logger.info("Using non-headless mode (no DISPLAY, but HEADLESS_BROWSER=false)")
             
             # Add window size (important for proper rendering)
             uc_options.add_argument('--window-size=1920,1080')
