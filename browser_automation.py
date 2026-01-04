@@ -90,28 +90,25 @@ class BrowserAutomation:
             logger.info("Trying to initialize Chrome with undetected-chromedriver...")
             
             # Create options for undetected-chromedriver
+            # NOTE: Do NOT use add_experimental_option with undetected-chromedriver!
+            # It handles stealth options internally and they conflict.
             uc_options = uc.ChromeOptions()
             
-            # Apply common arguments (skip headless, we'll handle it separately)
+            # Apply common arguments (skip headless for now - Cloudflare detects headless)
             for arg in common_args:
-                if 'headless' not in arg.lower():
+                # Skip headless and automation-related args - UC handles these
+                if 'headless' not in arg.lower() and 'AutomationControlled' not in arg:
                     uc_options.add_argument(arg)
             
-            # Handle headless mode - but note: Cloudflare detects headless browsers better
-            # Try without headless first, or use --headless=new with more stealth options
+            # For Cloudflare bypass, we need to try headless=new mode
+            # but if that doesn't work, try without headless
+            # NOTE: Cloudflare is very good at detecting headless browsers
             if config.HEADLESS_BROWSER:
-                # Use headless mode with additional stealth options
                 uc_options.add_argument('--headless=new')
                 uc_options.add_argument('--disable-gpu')
-                # Add more stealth options for headless mode
-                uc_options.add_argument('--disable-blink-features=AutomationControlled')
-                uc_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-                uc_options.add_experimental_option('useAutomationExtension', False)
-            else:
-                # In non-headless mode, also add stealth options
-                uc_options.add_argument('--disable-blink-features=AutomationControlled')
-                uc_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-                uc_options.add_experimental_option('useAutomationExtension', False)
+            
+            # Add window size for headless mode (important for some sites)
+            uc_options.add_argument('--window-size=1920,1080')
             
             # Try to find Chrome binary
             chrome_paths = [
