@@ -203,6 +203,9 @@ class FreelancehuntScraper:
                 # Last resort: use URL slug
                 title = href.split('/')[-2] if len(href.split('/')) > 2 else "Без названия"
             
+            # Get card text early - we'll use it for multiple parsing operations
+            card_text = card_element.get_text(' ', strip=True)
+            
             # Extract category - look for category links (/projects/skill/...)
             category = None
             category_links = card_element.find_all('a', href=re.compile(r'/projects/skill/'))
@@ -268,7 +271,7 @@ class FreelancehuntScraper:
             
             # Extract budget - look for UAH or currency symbols
             budget = None
-            card_text = card_element.get_text(' ', strip=True)
+            # card_text already defined above
             
             # Try to find budget in a separate cell/column first
             budget_cell = card_element.find(['td', 'div', 'span'], string=re.compile(r'UAH|грн|₴', re.I))
