@@ -315,11 +315,33 @@ class FreelancehuntScraper:
             # Navigate to projects page (with page parameter if needed)
             url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
             self.browser.driver.get(url)
-            time.sleep(3)  # Wait for page to load
             
-            # Get page HTML
-            html = self.browser.driver.page_source
-            return html
+            # Wait for Cloudflare challenge to complete (can take up to 10-15 seconds)
+            logger.info(f"Waiting for page {page} to load (Cloudflare challenge may appear)...")
+            max_wait = 20  # Maximum wait time in seconds
+            wait_interval = 1
+            waited = 0
+            
+            while waited < max_wait:
+                html = self.browser.driver.page_source
+                # Check if Cloudflare challenge is still present
+                if "Just a moment" in html or "cf-browser-verification" in html or "challenge-platform" in html:
+                    logger.debug(f"Cloudflare challenge detected, waiting... ({waited}s/{max_wait}s)")
+                    time.sleep(wait_interval)
+                    waited += wait_interval
+                else:
+                    # Page loaded successfully
+                    logger.info(f"Page {page} loaded successfully after {waited}s")
+                    break
+            
+            # Final check - if still Cloudflare, log warning but return HTML anyway
+            final_html = self.browser.driver.page_source
+            if "Just a moment" in final_html or "cf-browser-verification" in final_html:
+                logger.warning(f"Cloudflare challenge still present on page {page} after {max_wait}s wait")
+            else:
+                logger.info(f"Page {page} appears to be fully loaded")
+            
+            return final_html
         except Exception as e:
             logger.error(f"Error getting HTML via browser (page {page}): {e}")
             return None
