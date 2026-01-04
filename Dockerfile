@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     xdg-utils \
     xvfb \
+    x11-utils \
+    x11-xserver-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome (better for Linux servers)
