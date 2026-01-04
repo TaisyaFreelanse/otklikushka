@@ -358,41 +358,80 @@ class FreelancehuntScraper:
             try:
                 soup = BeautifulSoup(html_content, 'lxml')
                 
+                # Debug: log page structure
+                logger.debug(f"Page {page} HTML length: {len(html_content)}")
+                
                 # Find all project cards - try multiple selectors for better results
                 project_cards = []
                 
-                # Try various selectors to find project cards
-                # First, try to find table with projects
-                project_table = soup.find('table')
+                # First, find all links to projects to understand structure
+                all_project_links = soup.find_all('a', href=re.compile(r'/project/[^/]+/\d+'))
+                logger.info(f"Found {len(all_project_links)} project links on page {page}")
                 
-                selectors_to_try = []
-                if project_table:
-                    # If table found, look for rows with project links
-                    selectors_to_try.append(
-                        [tr for tr in project_table.find_all('tr') if tr.find('a', href=re.compile(r'/project/'))]
-                    )
-                    selectors_to_try.append(project_table.find_all('tbody tr'))
-                    selectors_to_try.append(project_table.select('tbody tr'))
+                if all_project_links:
+                    # Extract unique project rows/parents
+                    project_elements = []
+                    seen_ids = set()
+                    for link in all_project_links:
+                        # Try to find parent row or container
+                        parent = link.find_parent('tr')
+                        if not parent:
+                            # Try other parent containers
+                            parent = link.find_parent(['div', 'article', 'li', 'td'])
+                        
+                        if parent:
+                            # Extract project ID from link
+                            href = link.get('href', '')
+                            project_id_match = re.search(r'/(\d+)', href)
+                            if project_id_match:
+                                project_id = project_id_match.group(1)
+                                if project_id not in seen_ids:
+                                    seen_ids.add(project_id)
+                                    project_elements.append(parent)
+                    
+                    if project_elements:
+                        project_cards = project_elements
+                        logger.info(f"Found {len(project_cards)} project cards via parent elements on page {page}")
                 
-                # Generic selectors
-                selectors_to_try.extend([
-                    soup.select('table.table-projects tbody tr'),
-                    soup.select('tbody tr'),
-                    # Table rows with project links (from all tables)
-                    [tr for tr in soup.find_all('tr') if tr.find('a', href=re.compile(r'/project/'))],
-                    # Alternative structures
-                    soup.find_all('article', class_=re.compile(r'project|card', re.I)),
-                    soup.find_all('div', class_=re.compile(r'project|card', re.I)),
-                    soup.select('.project-item, .card-project, [class*="project"]'),
-                ])
+                # If no cards found, try table-based selectors
+                if not project_cards:
+                    project_table = soup.find('table')
+                    logger.debug(f"Looking for table: {project_table is not None}")
+                    
+                    if project_table:
+                        # Find all rows in table
+                        all_rows = project_table.find_all('tr')
+                        logger.debug(f"Found {len(all_rows)} rows in table")
+                        
+                        # Filter rows that contain project links
+                        project_rows = [tr for tr in all_rows if tr.find('a', href=re.compile(r'/project/'))]
+                        if project_rows:
+                            project_cards = project_rows
+                            logger.info(f"Found {len(project_cards)} project rows in table on page {page}")
                 
-                for selector_result in selectors_to_try:
-                    if selector_result:
-                        project_cards = selector_result
-                        logger.info(f"Found {len(project_cards)} project cards on page {page} using selector")
-                        break
+                # Fallback: try generic selectors
+                if not project_cards:
+                    selectors_to_try = [
+                        soup.select('table tbody tr'),
+                        soup.find_all('tr', class_=re.compile(r'project|item', re.I)),
+                        soup.find_all('article', class_=re.compile(r'project|card', re.I)),
+                        soup.find_all('div', class_=re.compile(r'project|card', re.I)),
+                    ]
+                    
+                    for selector_result in selectors_to_try:
+                        if selector_result:
+                            # Filter to only those with project links
+                            filtered = [elem for elem in selector_result if elem.find('a', href=re.compile(r'/project/'))]
+                            if filtered:
+                                project_cards = filtered
+                                logger.info(f"Found {len(project_cards)} project cards using fallback selector on page {page}")
+                                break
                 
-                all_project_cards.extend(project_cards)
+                if project_cards:
+                    logger.info(f"Successfully found {len(project_cards)} project cards on page {page}")
+                    all_project_cards.extend(project_cards)
+                else:
+                    logger.warning(f"No project cards found on page {page}. HTML sample: {html_content[:500]}")
                 
             except Exception as e:
                 logger.error(f"Error parsing projects page {page}: {e}")
