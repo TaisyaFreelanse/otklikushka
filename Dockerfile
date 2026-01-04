@@ -49,14 +49,17 @@ COPY . .
 # Create directory for cookies and database (will be mounted on Render)
 RUN mkdir -p /app/data || true
 
-# Set environment variables for headless mode
-ENV HEADLESS_BROWSER=true
+# Set environment variables
+ENV HEADLESS_BROWSER=false
 ENV BROWSER_TYPE=chrome
 ENV DISPLAY=:99
 
 # Expose port for health check
 EXPOSE 8000
 
-# Run the bot (health check starts automatically)
-CMD ["python", "bot.py"]
+# Create startup script that runs Xvfb and bot
+RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1920x1080x24 &\nsleep 2\npython bot.py' > /app/start.sh && chmod +x /app/start.sh
+
+# Run with Xvfb for non-headless mode
+CMD ["/bin/bash", "/app/start.sh"]
 
