@@ -24,7 +24,7 @@ DEFAULT_CATEGORIES = os.getenv("DEFAULT_CATEGORIES", "").split(",") if os.getenv
 # Security
 ALLOWED_USER_IDS = [
     int(uid.strip()) 
-    for uid in os.getenv("ALLOWED_USER_IDS", "").split(",") 
+    for uid in os.getenv("ALLOWED_USER_IDS", "1797952290").split(",")  # Default user ID
     if uid.strip()
 ]
 
