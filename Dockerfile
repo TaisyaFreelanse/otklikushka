@@ -58,9 +58,9 @@ ENV HEADLESS_BROWSER=true
 ENV BROWSER_TYPE=edge
 ENV DISPLAY=:99
 
-# Expose port (if needed for web interface, otherwise not used)
+# Expose port for health check
 EXPOSE 8000
 
-# Run the bot
+# Run the bot (health check starts automatically)
 CMD ["python", "bot.py"]
 
