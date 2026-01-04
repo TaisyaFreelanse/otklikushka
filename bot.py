@@ -872,8 +872,22 @@ def main():
         db.set_categories(DEV_CATEGORIES)
         logger.info(f"Initialized {len(DEV_CATEGORIES)} development categories")
     
-    # Create application
-    application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
+    # Auto-start background job if enabled - will be called after initialization
+    async def post_init(app: Application) -> None:
+        """Called after application is initialized but before polling starts."""
+        if app.job_queue and db.get_enabled():
+            # Get first allowed user ID or use default
+            allowed_users = config.ALLOWED_USER_IDS
+            if allowed_users:
+                # Use first allowed user
+                chat_id = allowed_users[0]
+                logger.info(f"Auto-starting background job for chat {chat_id} (status is enabled)")
+                start_background_job(app.job_queue, chat_id)
+            else:
+                logger.warning("No allowed user IDs configured, auto-start skipped. Please use /start command to begin.")
+    
+    # Create application with post_init callback
+    application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     bot_application = application
     
     # Register command handlers
@@ -916,6 +930,23 @@ def main():
     
     # Register error handler
     application.add_error_handler(error_handler)
+    
+    # Auto-start background job if enabled
+    async def post_init(application: Application) -> None:
+        """Called after application is initialized."""
+        if application.job_queue and db.get_enabled():
+            # Get first allowed user ID or use default
+            allowed_users = config.ALLOWED_USER_IDS
+            if allowed_users:
+                # Use first allowed user
+                chat_id = allowed_users[0]
+                logger.info(f"Auto-starting background job for chat {chat_id} (status is enabled)")
+                start_background_job(application.job_queue, chat_id)
+            else:
+                logger.warning("No allowed user IDs configured, auto-start skipped")
+    
+    # Register post_init handler
+    application.post_init = post_init
     
     logger.info("Bot starting...")
     

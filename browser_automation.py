@@ -80,7 +80,56 @@ class BrowserAutomation:
                     raise Exception(f"Не удалось инициализировать браузер (Edge и Chrome). Попробуйте проверить установку.")
     
     def _init_chrome(self, common_args: List[str]) -> webdriver.Chrome:
-        """Initialize Chrome WebDriver."""
+        """Initialize Chrome WebDriver using undetected-chromedriver to bypass Cloudflare."""
+        driver = None
+        
+        # Try undetected-chromedriver first (best for bypassing Cloudflare)
+        try:
+            import undetected_chromedriver as uc
+            
+            logger.info("Trying to initialize Chrome with undetected-chromedriver...")
+            
+            # Create options for undetected-chromedriver
+            uc_options = uc.ChromeOptions()
+            
+            # Apply common arguments
+            for arg in common_args:
+                if arg not in ['--headless=new']:  # Handle headless separately
+                    uc_options.add_argument(arg)
+            
+            # Handle headless mode
+            if config.HEADLESS_BROWSER:
+                uc_options.add_argument('--headless=new')
+            
+            # Try to find Chrome binary
+            chrome_paths = [
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/google-chrome',
+                '/usr/bin/chromium',
+                '/usr/bin/chromium-browser',
+            ]
+            chrome_binary = None
+            for path in chrome_paths:
+                if os.path.exists(path):
+                    chrome_binary = path
+                    logger.info(f"Found Chrome binary at: {path}")
+                    break
+            
+            # Initialize undetected-chromedriver
+            if chrome_binary:
+                driver = uc.Chrome(options=uc_options, browser_executable_path=chrome_binary, use_subprocess=False)
+            else:
+                driver = uc.Chrome(options=uc_options, use_subprocess=False)
+            
+            logger.info("Successfully initialized Chrome with undetected-chromedriver")
+            return driver
+            
+        except ImportError:
+            logger.warning("undetected-chromedriver not available, falling back to standard Chrome")
+        except Exception as e:
+            logger.warning(f"Failed to initialize undetected-chromedriver: {e}, falling back to standard Chrome")
+        
+        # Fallback to standard Chrome
         chrome_options = ChromeOptions()
         
         for arg in common_args:
@@ -88,10 +137,7 @@ class BrowserAutomation:
         
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        # Use a real user agent
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        
-        driver = None
         
         # Method 1: Try with automatic driver management (Selenium 4+)
         try:
@@ -106,13 +152,12 @@ class BrowserAutomation:
             except Exception:
                 # Method 3: Try system chrome/chromium with explicit binary location
                 try:
-                    # Try common paths for Chrome
                     chrome_paths = [
                         '/usr/bin/google-chrome-stable',
                         '/usr/bin/google-chrome',
                         '/usr/bin/chromium',
                         '/usr/bin/chromium-browser',
-                        '/opt/google/chrome/google-chrome',  # Alternative location
+                        '/opt/google/chrome/google-chrome',
                     ]
                     chrome_binary = None
                     for path in chrome_paths:
@@ -123,14 +168,12 @@ class BrowserAutomation:
                     
                     if chrome_binary:
                         chrome_options.binary_location = chrome_binary
-                        # Try with webdriver-manager again but with binary location set
                         try:
                             from webdriver_manager.chrome import ChromeDriverManager
                             driver_path = ChromeDriverManager().install()
                             service = ChromeService(executable_path=driver_path)
                             driver = webdriver.Chrome(service=service, options=chrome_options)
                         except:
-                            # Last resort: try without service
                             driver = webdriver.Chrome(options=chrome_options)
                     else:
                         raise Exception("Chrome binary not found in common paths")
