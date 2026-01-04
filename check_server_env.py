@@ -107,20 +107,20 @@ def check_dependencies():
     print("=" * 60)
     
     required = [
-        'selenium',
-        'undetected_chromedriver',
-        'beautifulsoup4',
-        'requests',
-        'python-telegram-bot',
+        ('selenium', 'selenium'),
+        ('undetected_chromedriver', 'undetected_chromedriver'),
+        ('beautifulsoup4', 'bs4'),
+        ('requests', 'requests'),
+        ('python-telegram-bot', 'telegram'),
     ]
     
     all_ok = True
-    for dep in required:
+    for dep_name, import_name in required:
         try:
-            __import__(dep.replace('-', '_'))
-            print(f"✅ {dep}")
+            __import__(import_name)
+            print(f"✅ {dep_name}")
         except ImportError:
-            print(f"❌ {dep} не установлен!")
+            print(f"❌ {dep_name} не установлен!")
             all_ok = False
     
     return all_ok

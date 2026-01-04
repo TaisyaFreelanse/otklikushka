@@ -59,8 +59,8 @@ ENV DISPLAY=:99
 # Expose port for health check
 EXPOSE 8000
 
-# Create startup script that runs Xvfb and bot with better error handling
-RUN echo '#!/bin/bash\nset -e\n# Clean up old Xvfb processes\nrm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true\npkill -f Xvfb 2>/dev/null || true\nsleep 1\n# Start Xvfb in background\nXvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &\nXVFB_PID=$!\nsleep 2\n# Verify Xvfb is running\nif ! kill -0 $XVFB_PID 2>/dev/null; then\n    echo "ERROR: Xvfb failed to start"\n    exit 1\nfi\nexport DISPLAY=:99\nsleep 2\n# Verify DISPLAY is accessible\nif ! xdpyinfo -display :99 >/dev/null 2>&1; then\n    echo "ERROR: DISPLAY :99 is not accessible"\n    exit 1\nfi\necho "Xvfb started successfully, DISPLAY=$DISPLAY"\n# Start bot\npython bot.py' > /app/start.sh && chmod +x /app/start.sh
+# Create startup script that runs Xvfb and bot with better error handling and memory optimization
+RUN echo '#!/bin/bash\nset -e\n# Clean up old Xvfb processes\nrm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true\npkill -f Xvfb 2>/dev/null || true\nsleep 1\n# Start Xvfb with smaller screen to save memory (1280x720 instead of 1920x1080)\nXvfb :99 -screen 0 1280x720x16 -ac +extension GLX +render -noreset &\nXVFB_PID=$!\nsleep 2\n# Verify Xvfb is running\nif ! kill -0 $XVFB_PID 2>/dev/null; then\n    echo "ERROR: Xvfb failed to start"\n    exit 1\nfi\nexport DISPLAY=:99\nsleep 1\n# Verify DISPLAY is accessible (skip xdpyinfo to save memory)\nif [ ! -S /tmp/.X11-unix/X99 ]; then\n    echo "WARNING: X11 socket not found, but continuing..."\nfi\necho "Xvfb started successfully, DISPLAY=$DISPLAY"\n# Start bot\npython bot.py' > /app/start.sh && chmod +x /app/start.sh
 
 # Run with Xvfb for non-headless mode
 CMD ["/bin/bash", "/app/start.sh"]
