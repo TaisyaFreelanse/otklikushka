@@ -31,9 +31,18 @@ ALLOWED_USER_IDS = [
 # Paths
 BASE_DIR = Path(__file__).parent
 # Use /app/data for Render persistent disk, fallback to local directory
-DATA_DIR = Path("/app/data") if Path("/app/data").exists() else BASE_DIR
-COOKIES_PATH = DATA_DIR / COOKIES_FILE if DATA_DIR.exists() else BASE_DIR / COOKIES_FILE
-DATABASE_PATH = DATA_DIR / DATABASE_FILE if DATA_DIR.exists() else BASE_DIR / DATABASE_FILE
+# Check if /app/data exists (Render persistent disk) or use BASE_DIR
+DATA_DIR = Path("/app/data")
+if not DATA_DIR.exists():
+    DATA_DIR = BASE_DIR
+    # Try to create /app/data if we're in Docker but it doesn't exist yet
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except:
+        pass
+
+COOKIES_PATH = DATA_DIR / COOKIES_FILE
+DATABASE_PATH = DATA_DIR / DATABASE_FILE
 
 # Browser Configuration
 HEADLESS_BROWSER = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
