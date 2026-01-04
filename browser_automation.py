@@ -42,12 +42,37 @@ class BrowserAutomation:
         browser_type = config.BROWSER_TYPE.lower()
         
         # Common options for both browsers
+        # Memory optimization for limited server resources (512MB limit)
         common_args = [
             '--no-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-blink-features=AutomationControlled',
-            '--window-size=1920,1080',
             '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images',  # Don't load images to save memory
+            '--disable-javascript-harmony-shipping',
+            '--disable-background-networking',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-client-side-phishing-detection',
+            '--disable-component-update',
+            '--disable-default-apps',
+            '--disable-domain-reliability',
+            '--disable-features=TranslateUI',
+            '--disable-hang-monitor',
+            '--disable-ipc-flooding-protection',
+            '--disable-prompt-on-repost',
+            '--disable-sync',
+            '--disable-web-resources',
+            '--metrics-recording-only',
+            '--no-first-run',
+            '--safebrowsing-disable-auto-update',
+            '--password-store=basic',
+            '--use-mock-keychain',
+            '--window-size=1280,720',  # Smaller window to save memory
+            '--lang=ru-RU,ru,en-US,en',
         ]
         
         if config.HEADLESS_BROWSER:
