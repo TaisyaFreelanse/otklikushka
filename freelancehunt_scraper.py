@@ -570,6 +570,30 @@ class FreelancehuntScraper:
                 if not project:
                     continue
                 
+                # Filter by time FIRST - only projects created less than 24 hours ago
+                created_at = project.get('created_at')
+                if created_at:
+                    try:
+                        if isinstance(created_at, str):
+                            # Parse ISO format datetime
+                            created_at_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        else:
+                            created_at_dt = created_at
+                        
+                        # Get current time (same timezone if available)
+                        now = datetime.now(created_at_dt.tzinfo) if created_at_dt.tzinfo else datetime.now()
+                        
+                        # Calculate time difference
+                        time_diff = now - created_at_dt
+                        
+                        # Skip projects older than 24 hours
+                        if time_diff.total_seconds() > 86400:  # 24 hours in seconds
+                            logger.debug(f"Skipping project {project['id']} - too old ({time_diff.days} days ago)")
+                            continue
+                    except Exception as e:
+                        logger.warning(f"Error parsing created_at for project {project.get('id')}: {e}")
+                        # Continue anyway if parsing fails
+                
                 # Check if project is new (in both tables)
                 project_id = project['id']
                 if self.db.project_exists(project_id):
