@@ -12,6 +12,8 @@ from telegram.ext import (
     JobQueue,
 )
 from telegram.constants import ParseMode
+from telegram.error import Conflict, NetworkError, RetryAfter
+import sys
 import config
 from database import Database
 from freelancehunt_scraper import FreelancehuntScraper
@@ -876,8 +878,71 @@ def main():
     # Register callback query handler for buttons
     application.add_handler(CallbackQueryHandler(button_callback))
     
+    # Add error handler for Conflict errors
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle errors in the telegram-python-bot library."""
+        logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+        
+        # Handle Conflict error (multiple bot instances)
+        if isinstance(context.error, Conflict):
+            logger.error("=" * 60)
+            logger.error("CONFLICT ERROR: Multiple bot instances detected!")
+            logger.error("The bot is already running somewhere else.")
+            logger.error("Please stop the other instance before starting this one.")
+            logger.error("=" * 60)
+            # Wait a bit and try to continue (in case other instance stops)
+            await asyncio.sleep(5)
+            return
+        
+        # Handle network errors
+        if isinstance(context.error, NetworkError):
+            logger.warning(f"Network error: {context.error}. Will retry...")
+            await asyncio.sleep(5)
+            return
+        
+        # Handle rate limiting
+        if isinstance(context.error, RetryAfter):
+            logger.warning(f"Rate limited. Waiting {context.error.retry_after} seconds...")
+            await asyncio.sleep(context.error.retry_after)
+            return
+    
+    # Register error handler
+    application.add_error_handler(error_handler)
+    
     logger.info("Bot starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Run with retry logic for Conflict errors
+    max_retries = 5
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            application.run_polling(
+                allowed_updates=Update.ALL_TYPES,
+                stop_signals=None,  # Don't stop on SIGTERM (for Docker)
+                drop_pending_updates=True  # Drop pending updates on start
+            )
+            break  # Success, exit loop
+        except Conflict as e:
+            retry_count += 1
+            logger.error(f"Conflict error (attempt {retry_count}/{max_retries}): {e}")
+            if retry_count >= max_retries:
+                logger.error("Maximum retries reached. Another bot instance is running.")
+                logger.error("Please stop the other bot instance and try again.")
+                sys.exit(1)
+            logger.info(f"Waiting 10 seconds before retry {retry_count + 1}...")
+            import time
+            time.sleep(10)
+        except KeyboardInterrupt:
+            logger.info("Bot stopped by user")
+            break
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}", exc_info=True)
+            if retry_count >= max_retries:
+                sys.exit(1)
+            retry_count += 1
+            import time
+            time.sleep(10)
 
 
 if __name__ == '__main__':
@@ -885,6 +950,8 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
     finally:
         if browser:
             browser.close()
