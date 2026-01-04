@@ -218,7 +218,8 @@ class BrowserAutomation:
         
         try:
             self.driver.get(self.base_url)
-            time.sleep(2)
+            # Wait for Cloudflare challenge to complete
+            time.sleep(8)
             
             with open(self.cookies_path, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)
