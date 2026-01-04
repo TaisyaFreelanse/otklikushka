@@ -22,6 +22,9 @@ from selenium.common.exceptions import (
 )
 import config
 from database import Database
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BrowserAutomation:
@@ -51,7 +54,8 @@ class BrowserAutomation:
             common_args.append('--headless=new')
         
         # Try Chrome first (better for Linux servers)
-        if browser_type == "chrome" or browser_type != "edge":
+        # Default to Chrome if not explicitly set to edge
+        if browser_type != "edge":
             try:
                 return self._init_chrome(common_args)
             except Exception as e:
