@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from typing import List, Dict, Optional, Union
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse
 import time
 import logging
@@ -128,6 +128,42 @@ class FreelancehuntScraper:
         
         return None
     
+    def parse_relative_time(self, time_text: str) -> datetime:
+        """Parse relative time like '2 часа 17 минут назад' to datetime."""
+        try:
+            now = datetime.now()
+            
+            # Pattern: "X минут назад", "X часов Y минут назад", "X часов назад", "X дней назад"
+            # Minutes
+            minutes_match = re.search(r'(\d+)\s*минут\s*назад', time_text, re.I)
+            if minutes_match:
+                minutes = int(minutes_match.group(1))
+                return (now - timedelta(minutes=minutes))
+            
+            # Hours and minutes: "2 часа 17 минут назад"
+            hours_minutes_match = re.search(r'(\d+)\s*час(?:а|ов)?\s*(\d+)\s*минут\s*назад', time_text, re.I)
+            if hours_minutes_match:
+                hours = int(hours_minutes_match.group(1))
+                minutes = int(hours_minutes_match.group(2))
+                return (now - timedelta(hours=hours, minutes=minutes))
+            
+            # Just hours: "2 часа назад"
+            hours_match = re.search(r'(\d+)\s*час(?:а|ов)?\s*назад', time_text, re.I)
+            if hours_match:
+                hours = int(hours_match.group(1))
+                return (now - timedelta(hours=hours))
+            
+            # Days: "X дней назад"
+            days_match = re.search(r'(\d+)\s*д(?:ень|ня|ней)\s*назад', time_text, re.I)
+            if days_match:
+                days = int(days_match.group(1))
+                return (now - timedelta(days=days))
+            
+            return now
+        except Exception as e:
+            logger.warning(f"Error parsing relative time '{time_text}': {e}")
+            return datetime.now()
+    
     def parse_project_card(self, card_element) -> Optional[Dict]:
         """Parse a single project card element."""
         try:
@@ -151,10 +187,10 @@ class FreelancehuntScraper:
             if not project_id:
                 return None
             
-            # Extract title - try multiple sources
-            title = link_elem.get_text(strip=True)
+            # Extract title - prefer title attribute, then text
+            title = link_elem.get('title', '').strip()
             if not title:
-                title = link_elem.get('title', '').strip()
+                title = link_elem.get_text(strip=True)
             if not title:
                 # Try finding title in parent or siblings
                 parent = link_elem.find_parent(['td', 'div', 'span'])
@@ -167,29 +203,44 @@ class FreelancehuntScraper:
                 # Last resort: use URL slug
                 title = href.split('/')[-2] if len(href.split('/')) > 2 else "Без названия"
             
-            # Extract category - look in various places
+            # Extract category - look for category links (/projects/skill/...)
             category = None
-            # Try to find category in the card
-            category_elem = card_element.find(['span', 'div', 'td'], class_=re.compile(r'category|tag|badge|label', re.I))
-            if category_elem:
-                category = category_elem.get_text(strip=True)
+            category_links = card_element.find_all('a', href=re.compile(r'/projects/skill/'))
+            if category_links:
+                # Get text from category links
+                categories = [link.get_text(strip=True) for link in category_links if link.get_text(strip=True)]
+                if categories:
+                    # Join multiple categories
+                    category = ', '.join(categories[:2])  # Limit to 2 categories
+            else:
+                # Fallback: try to find category in other elements
+                category_elem = card_element.find(['span', 'div', 'td'], class_=re.compile(r'category|tag|badge|label', re.I))
+                if category_elem:
+                    category = category_elem.get_text(strip=True)
             
-            # If not found, try looking for text that looks like a category
+            # If still not found, try looking for common category patterns in text
             if not category:
                 text_content = card_element.get_text(' ', strip=True)
-                # Common category patterns
-                category_match = re.search(r'(Программирование|Разработка|Дизайн|Маркетинг|Текст|Перевод)', text_content, re.I)
+                # Match common category names
+                category_match = re.search(r'(Программирование|Разработка|Дизайн|Маркетинг|Текст|Перевод|Веб-программирование)', text_content, re.I)
                 if category_match:
                     category = category_match.group(1)
             
             # Extract budget - look for UAH or currency symbols
             budget = None
-            # Search in the entire card text
             card_text = card_element.get_text(' ', strip=True)
-            budget_match = re.search(r'(\d+(?:\s*\d+)*)\s*(?:UAH|грн|₴)', card_text, re.I)
-            if budget_match:
-                budget_text = budget_match.group(1).replace(' ', '')
+            
+            # Try to find budget in a separate cell/column first
+            budget_cell = card_element.find(['td', 'div', 'span'], string=re.compile(r'UAH|грн|₴', re.I))
+            if budget_cell:
+                budget_text = budget_cell.get_text(strip=True)
                 budget = self.parse_budget(budget_text)
+            else:
+                # Search in the entire card text
+                budget_match = re.search(r'(\d+(?:\s*\d+)*)\s*(?:UAH|грн|₴)', card_text, re.I)
+                if budget_match:
+                    budget_text = budget_match.group(1).replace(' ', '')
+                    budget = self.parse_budget(budget_text)
             
             # Extract deadline
             deadline = None
@@ -197,21 +248,40 @@ class FreelancehuntScraper:
             if deadline_match:
                 deadline = int(deadline_match.group(1))
             
-            # Extract creation time
+            # Extract creation time - look for relative time patterns
             created_at = None
-            time_elem = card_element.find(['time', 'span', 'td'], class_=re.compile(r'time|date|created|ago', re.I))
-            if time_elem:
-                datetime_attr = time_elem.get('datetime')
-                if datetime_attr:
-                    created_at = datetime_attr
-                else:
-                    created_at = time_elem.get_text(strip=True)
+            created_at_datetime = datetime.now()
             
-            # If no time found, try to parse relative time from text
-            if not created_at:
-                time_match = re.search(r'(\d+)\s*(?:мин|час|час|день|минут|часов|дней)\s*(?:назад|ago)', card_text, re.I)
+            # Look for relative time patterns: "X минут назад", "X часов Y минут назад", etc.
+            time_patterns = [
+                r'(\d+)\s*час(?:а|ов)?\s*(\d+)\s*минут\s*назад',  # "2 часа 17 минут назад"
+                r'(\d+)\s*минут\s*назад',  # "26 минут назад"
+                r'(\d+)\s*час(?:а|ов)?\s*назад',  # "2 часа назад"
+                r'(\d+)\s*д(?:ень|ня|ней)\s*назад',  # "X дней назад"
+            ]
+            
+            time_text = None
+            for pattern in time_patterns:
+                time_match = re.search(pattern, card_text, re.I)
                 if time_match:
-                    created_at = datetime.now().isoformat()
+                    # Get the full match
+                    time_text = time_match.group(0)
+                    created_at_datetime = self.parse_relative_time(time_text)
+                    created_at = created_at_datetime.isoformat()
+                    break
+            
+            # Fallback: try to find time element with datetime attribute
+            if not created_at:
+                time_elem = card_element.find(['time', 'span', 'td'], class_=re.compile(r'time|date|created|ago', re.I))
+                if time_elem:
+                    datetime_attr = time_elem.get('datetime')
+                    if datetime_attr:
+                        created_at = datetime_attr
+                    else:
+                        time_text_elem = time_elem.get_text(strip=True)
+                        if time_text_elem:
+                            created_at_datetime = self.parse_relative_time(time_text_elem)
+                            created_at = created_at_datetime.isoformat()
             
             return {
                 'id': project_id,
@@ -292,19 +362,29 @@ class FreelancehuntScraper:
                 project_cards = []
                 
                 # Try various selectors to find project cards
-                selectors_to_try = [
-                    # Table structure (most common)
+                # First, try to find table with projects
+                project_table = soup.find('table')
+                
+                selectors_to_try = []
+                if project_table:
+                    # If table found, look for rows with project links
+                    selectors_to_try.append(
+                        [tr for tr in project_table.find_all('tr') if tr.find('a', href=re.compile(r'/project/'))]
+                    )
+                    selectors_to_try.append(project_table.find_all('tbody tr'))
+                    selectors_to_try.append(project_table.select('tbody tr'))
+                
+                # Generic selectors
+                selectors_to_try.extend([
                     soup.select('table.table-projects tbody tr'),
                     soup.select('tbody tr'),
-                    # Table rows with project links
-                    soup.find_all('tr', class_=re.compile(r'project|item', re.I)),
-                    # Look for any row containing project links
+                    # Table rows with project links (from all tables)
                     [tr for tr in soup.find_all('tr') if tr.find('a', href=re.compile(r'/project/'))],
                     # Alternative structures
                     soup.find_all('article', class_=re.compile(r'project|card', re.I)),
                     soup.find_all('div', class_=re.compile(r'project|card', re.I)),
                     soup.select('.project-item, .card-project, [class*="project"]'),
-                ]
+                ])
                 
                 for selector_result in selectors_to_try:
                     if selector_result:
