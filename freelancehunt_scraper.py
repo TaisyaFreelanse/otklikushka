@@ -375,7 +375,31 @@ class FreelancehuntScraper:
             
             # Navigate to projects page (with page parameter if needed)
             url = self.projects_url if page == 1 else f"{self.projects_url}?page={page}"
+            
+            # Add a small delay before navigation to appear more human-like
+            import random
+            time.sleep(random.uniform(1, 3))
+            
+            # Navigate with realistic behavior
             self.browser.driver.get(url)
+            
+            # Immediately simulate some human activity before Cloudflare check
+            try:
+                time.sleep(random.uniform(0.5, 1.5))
+                # Move mouse slightly
+                self.browser.driver.execute_script("""
+                    var event = new MouseEvent('mousemove', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        clientX: 100,
+                        clientY: 100
+                    });
+                    document.dispatchEvent(event);
+                """)
+                time.sleep(random.uniform(0.3, 0.8))
+            except:
+                pass
             
             # Wait for Cloudflare challenge to complete (can take up to 120 seconds on server)
             logger.info(f"Waiting for page {page} to load (Cloudflare challenge may appear)...")
