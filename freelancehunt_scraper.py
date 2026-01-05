@@ -399,27 +399,81 @@ class FreelancehuntScraper:
                     if waited % 15 == 0:  # Log every 15 seconds
                         logger.info(f"Cloudflare challenge detected, waiting... ({waited}s/{max_wait}s)")
                     
-                    # Try to interact with page to help Cloudflare verify (simulate human behavior)
+                    # Enhanced human-like interaction simulation to help Cloudflare verify
                     try:
-                        # Scroll a bit (randomized to look more human)
-                        scroll_pos = int(100 + (waited * 2))
-                        self.browser.driver.execute_script(f"window.scrollTo(0, {scroll_pos});")
-                        time.sleep(1)
+                        import random
                         
-                        # Move mouse cursor
-                        self.browser.driver.execute_script(
-                            "document.dispatchEvent(new MouseEvent('mousemove', "
-                            "{bubbles: true, cancelable: true, view: window, clientX: 100, clientY: 100}));"
-                        )
-                        time.sleep(0.5)
+                        # Random delay to make behavior less predictable (1-3 seconds)
+                        human_delay = random.uniform(1, 3)
+                        time.sleep(human_delay)
                         
-                        # Sometimes click somewhere to simulate user activity
-                        if waited % 30 == 0:
-                            self.browser.driver.execute_script("document.body.click();")
+                        # More realistic mouse movement pattern
+                        mouse_x = random.randint(50, 200)
+                        mouse_y = random.randint(50, 300)
+                        self.browser.driver.execute_script(f"""
+                            var event = new MouseEvent('mousemove', {{
+                                bubbles: true,
+                                cancelable: true,
+                                view: window,
+                                clientX: {mouse_x},
+                                clientY: {mouse_y},
+                                movementX: {random.randint(-10, 10)},
+                                movementY: {random.randint(-10, 10)}
+                            }});
+                            document.dispatchEvent(event);
+                        """)
+                        
+                        # Smooth scroll (human-like, not instant)
+                        scroll_pos = random.randint(100, 500)
+                        self.browser.driver.execute_script(f"""
+                            window.scrollTo({{
+                                top: {scroll_pos},
+                                behavior: 'smooth'
+                            }});
+                        """)
+                        time.sleep(random.uniform(0.5, 1.5))
+                        
+                        # Random mouse click every 20-30 seconds to simulate active user
+                        if waited % 25 == 0:
+                            click_x = random.randint(100, 400)
+                            click_y = random.randint(100, 300)
+                            self.browser.driver.execute_script(f"""
+                                var clickEvent = new MouseEvent('click', {{
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window,
+                                    clientX: {click_x},
+                                    clientY: {click_y}
+                                }});
+                                document.elementFromPoint({click_x}, {click_y})?.dispatchEvent(clickEvent);
+                            """)
+                            time.sleep(random.uniform(0.5, 1))
+                        
+                        # Scroll back up occasionally
+                        if waited % 40 == 0:
+                            self.browser.driver.execute_script("window.scrollTo({top: 0, behavior: 'smooth'});")
+                            time.sleep(random.uniform(1, 2))
+                        
+                        # Simulate keyboard activity occasionally
+                        if waited % 35 == 0:
+                            self.browser.driver.execute_script("""
+                                var keyEvent = new KeyboardEvent('keydown', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    key: 'Tab',
+                                    code: 'Tab'
+                                });
+                                document.dispatchEvent(keyEvent);
+                            """)
+                            time.sleep(0.3)
+                            
                     except Exception as e:
                         logger.debug(f"Error simulating interaction: {e}")
                     
-                    time.sleep(wait_interval)
+                    # Add random wait to make timing less predictable
+                    remaining_wait = wait_interval - human_delay if 'human_delay' in locals() else wait_interval
+                    if remaining_wait > 0:
+                        time.sleep(remaining_wait)
                     waited += wait_interval
                 else:
                     # Page loaded successfully
