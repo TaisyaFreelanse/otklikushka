@@ -409,8 +409,14 @@ async def check_projects_callback(context: ContextTypes.DEFAULT_TYPE):
         
         categories = db.get_categories()
         
-        # Get new projects
-        new_projects = scraper.get_new_projects(categories if categories else None)
+        # IMPORTANT: Only get projects that match specified categories
+        # If no categories set, skip ALL projects (no bids on projects outside categories)
+        if not categories or len(categories) == 0:
+            logger.info("No categories configured - skipping all projects. Set categories in settings.")
+            return
+        
+        # Get new projects (only those matching categories)
+        new_projects = scraper.get_new_projects(categories)
         
         logger.info(f"Found {len(new_projects)} new projects")
         

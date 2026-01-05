@@ -711,9 +711,6 @@ class FreelancehuntScraper:
                 if self.db.project_exists(project_id):
                     continue
                 
-                # Filter by categories if specified
-                project_matches_category = True  # Default: if no categories, all projects match
-                
                 # Exclude unwanted categories FIRST (before category matching)
                 project_category = (project.get('category') or '').lower()
                 excluded_categories_global = [
@@ -729,6 +726,10 @@ class FreelancehuntScraper:
                 if any(excluded in project_category for excluded in excluded_categories_global):
                     logger.debug(f"Skipping project {project_id} due to excluded category: {project_category}")
                     continue
+                
+                # IMPORTANT: Only process projects that match specified categories
+                # If no categories specified, skip ALL projects (no bids on projects outside categories)
+                project_matches_category = False  # Default: NO match unless categories are specified and matched
                 
                 if categories and len(categories) > 0:
                     # Only filter if categories are specified
