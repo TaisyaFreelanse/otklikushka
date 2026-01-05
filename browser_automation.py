@@ -182,7 +182,8 @@ class BrowserAutomation:
                         user_data_dir=profile_dir,  # Pass directly, not via options
                         use_subprocess=False,
                         version_main=None,  # Auto-detect version
-                        no_sandbox=True  # Required for Docker/containers
+                        no_sandbox=True,  # Required for Docker/containers
+                        driver_executable_path=None  # Let UC manage driver
                     )
                 else:
                     driver = uc.Chrome(
@@ -190,13 +191,75 @@ class BrowserAutomation:
                         user_data_dir=profile_dir,  # Pass directly, not via options
                         use_subprocess=False,
                         version_main=None,
-                        no_sandbox=True
+                        no_sandbox=True,
+                        driver_executable_path=None
                     )
             except Exception as e:
                 logger.error(f"Error initializing undetected-chromedriver: {e}")
                 raise
             
-            logger.info("Successfully initialized Chrome with undetected-chromedriver")
+            # Apply additional stealth techniques using selenium-stealth
+            try:
+                from selenium_stealth import stealth
+                stealth(
+                    driver,
+                    languages=["en-US", "en", "ru-RU", "ru"],
+                    vendor="Google Inc.",
+                    platform="Win32",
+                    webgl_vendor="Intel Inc.",
+                    renderer="Intel Iris OpenGL Engine",
+                    fix_hairline=True,
+                )
+                logger.info("✅ Applied selenium-stealth additional masking")
+            except ImportError:
+                logger.warning("selenium-stealth not available, skipping additional stealth")
+            except Exception as e:
+                logger.warning(f"Failed to apply selenium-stealth: {e}")
+            
+            # Additional JavaScript-based stealth patches
+            try:
+                driver.execute_script("""
+                    // Remove webdriver flag
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    
+                    // Override plugins
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    
+                    // Override languages
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en', 'ru-RU', 'ru']
+                    });
+                    
+                    // Override permissions
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters.name === 'notifications' ?
+                            Promise.resolve({ state: Notification.permission }) :
+                            originalQuery(parameters)
+                    );
+                """)
+                logger.info("✅ Applied JavaScript-based stealth patches")
+            except Exception as e:
+                logger.debug(f"Could not apply JS stealth patches: {e}")
+            
+            # Set realistic viewport and user agent if not already set
+            try:
+                driver.set_window_size(1280, 720)
+                # Execute stealth scripts to remove automation traces
+                driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                })
+                # Remove webdriver property
+                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                logger.info("✅ Applied additional stealth patches via CDP")
+            except Exception as e:
+                logger.debug(f"Could not apply CDP stealth: {e}")
+            
+            logger.info("Successfully initialized Chrome with undetected-chromedriver + stealth")
             return driver
             
         except ImportError:

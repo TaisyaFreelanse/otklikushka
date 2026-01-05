@@ -1,6 +1,7 @@
 python-telegram-bot[job-queue]==20.7
 selenium==4.15.0
 undetected-chromedriver==3.5.4
+selenium-stealth==1.0.6
 beautifulsoup4==4.12.2
 requests==2.31.0
 python-dotenv==1.0.0
