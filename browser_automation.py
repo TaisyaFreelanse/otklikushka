@@ -48,15 +48,19 @@ class BrowserAutomation:
         logger.info(f"BROWSER_TYPE from env: '{browser_type_raw}'")
         logger.info(f"BROWSER_TYPE from config: '{browser_type_config}'")
         
-        # Default to Chrome if empty or not explicitly set to edge
-        if not browser_type_raw or browser_type_raw not in ["edge"]:
+        # ALWAYS use Chrome on server (Edge is not available and causes errors)
+        # Only check if explicitly set to edge, then warn and use Chrome anyway
+        if browser_type_raw == "edge":
+            logger.warning(f"⚠️ BROWSER_TYPE is set to 'edge', but Edge is not available on this server. Forcing Chrome instead.")
             browser_type = "chrome"
-            logger.info(f"Forcing Chrome browser (BROWSER_TYPE was '{browser_type_raw}', defaulting to Chrome)")
         else:
-            browser_type = browser_type_raw
-            logger.info(f"Using {browser_type} browser from environment variable")
+            browser_type = "chrome"
+            if browser_type_raw and browser_type_raw != "chrome":
+                logger.warning(f"⚠️ Unknown BROWSER_TYPE '{browser_type_raw}', using Chrome instead")
+            else:
+                logger.info(f"✅ Using Chrome browser (BROWSER_TYPE='{browser_type_raw or 'not set (defaulting to Chrome)'}')")
         
-        # Common options for both browsers
+        # Common options for browsers (Chrome-specific optimizations)
         # Memory optimization for limited server resources (512MB limit)
         common_args = [
             '--no-sandbox',
@@ -93,28 +97,13 @@ class BrowserAutomation:
         if config.HEADLESS_BROWSER:
             common_args.append('--headless=new')
         
-        # Use only the specified browser type (no fallback)
-        if browser_type == "chrome":
-            logger.info(f"Initializing Chrome browser (BROWSER_TYPE={browser_type})...")
-            try:
-                return self._init_chrome(common_args)
-            except Exception as e:
-                logger.error(f"Failed to initialize Chrome: {e}")
-                raise Exception(f"Не удалось инициализировать Chrome. Проверьте установку Chrome и доступность DISPLAY.")
-        elif browser_type == "edge":
-            logger.info(f"Initializing Edge browser (BROWSER_TYPE={browser_type})...")
-            try:
-                return self._init_edge(common_args)
-            except Exception as e:
-                logger.error(f"Failed to initialize Edge: {e}")
-                raise Exception(f"Не удалось инициализировать Edge. Проверьте установку Edge.")
-        else:
-            logger.warning(f"Unknown browser type '{browser_type}', defaulting to Chrome")
-            try:
-                return self._init_chrome(common_args)
-            except Exception as e:
-                logger.error(f"Failed to initialize Chrome as default: {e}")
-                raise Exception(f"Не удалось инициализировать Chrome. Проверьте установку Chrome и доступность DISPLAY.")
+        # Always use Chrome (Edge support removed - not available on server)
+        logger.info(f"Initializing Chrome browser...")
+        try:
+            return self._init_chrome(common_args)
+        except Exception as e:
+            logger.error(f"Failed to initialize Chrome: {e}")
+            raise Exception(f"Не удалось инициализировать Chrome. Проверьте установку Chrome и доступность DISPLAY.")
     
     def _init_chrome(self, common_args: List[str]) -> webdriver.Chrome:
         """Initialize Chrome WebDriver using undetected-chromedriver to bypass Cloudflare."""
