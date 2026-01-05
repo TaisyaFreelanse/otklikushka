@@ -714,6 +714,22 @@ class FreelancehuntScraper:
                 # Filter by categories if specified
                 project_matches_category = True  # Default: if no categories, all projects match
                 
+                # Exclude unwanted categories FIRST (before category matching)
+                project_category = (project.get('category') or '').lower()
+                excluded_categories_global = [
+                    'интернет-магазины и электронная коммерция',
+                    'интернет-магазины',
+                    'электронная коммерция',
+                    'дизайн визиток',
+                    'визитки',
+                    'фирменный стиль',
+                    'брендинг',
+                    'логотип',
+                ]
+                if any(excluded in project_category for excluded in excluded_categories_global):
+                    logger.debug(f"Skipping project {project_id} due to excluded category: {project_category}")
+                    continue
+                
                 if categories and len(categories) > 0:
                     # Only filter if categories are specified
                     project_matches_category = False
@@ -722,8 +738,7 @@ class FreelancehuntScraper:
                     search_text = (project.get('title', '') + ' ' + 
                                  (project.get('category', '') or '')).lower()
                     
-                    # Check if any category keyword matches
-                    project_category = (project.get('category') or '').lower()
+                    # Check if any category keyword matches (project_category already set above)
                     
                     for cat in categories:
                         if not cat:
@@ -762,6 +777,11 @@ class FreelancehuntScraper:
                             'интернет-магазины и электронная коммерция',
                             'интернет-магазины',
                             'электронная коммерция',
+                            'дизайн визиток',
+                            'визитки',
+                            'фирменный стиль',
+                            'брендинг',
+                            'логотип',
                         ]
                         if any(excluded in project_category.lower() for excluded in excluded_categories):
                             project_matches_category = False
