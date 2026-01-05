@@ -45,6 +45,10 @@ COOKIES_PATH = DATA_DIR / COOKIES_FILE
 DATABASE_PATH = DATA_DIR / DATABASE_FILE
 
 # Browser Configuration
-HEADLESS_BROWSER = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
-BROWSER_TYPE = os.getenv("BROWSER_TYPE", "chrome")  # chrome or edge (chrome works better on Linux servers)
+HEADLESS_BROWSER = os.getenv("HEADLESS_BROWSER", "false").lower() == "true"
+# Force Chrome by default (works better on Linux servers)
+# Only use Edge if explicitly set via environment variable
+BROWSER_TYPE = os.getenv("BROWSER_TYPE", "chrome").lower().strip()
+if BROWSER_TYPE not in ["chrome", "edge"]:
+    BROWSER_TYPE = "chrome"  # Force Chrome if invalid value
 

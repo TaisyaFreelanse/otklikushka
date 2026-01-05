@@ -132,8 +132,16 @@ def check_browser_init():
     print("=" * 60)
     
     try:
+        import os
+        import config
         from browser_automation import BrowserAutomation
         from database import Database
+        
+        # Show what BROWSER_TYPE is set to
+        browser_type_env = os.getenv("BROWSER_TYPE", "NOT SET")
+        browser_type_config = config.BROWSER_TYPE
+        print(f"BROWSER_TYPE from env: '{browser_type_env}'")
+        print(f"BROWSER_TYPE from config: '{browser_type_config}'")
         
         db = Database()
         browser = BrowserAutomation(db)

@@ -39,7 +39,22 @@ class BrowserAutomation:
         
     def init_driver(self) -> Union[webdriver.Edge, webdriver.Chrome]:
         """Initialize browser WebDriver (Chrome or Edge)."""
-        browser_type = config.BROWSER_TYPE.lower()
+        # Force Chrome if BROWSER_TYPE is not explicitly set to something else
+        # This ensures we always use Chrome on server
+        browser_type_raw = os.getenv("BROWSER_TYPE", "").lower().strip()
+        browser_type_config = config.BROWSER_TYPE.lower().strip()
+        
+        # Log what we're reading
+        logger.info(f"BROWSER_TYPE from env: '{browser_type_raw}'")
+        logger.info(f"BROWSER_TYPE from config: '{browser_type_config}'")
+        
+        # Default to Chrome if empty or not explicitly set to edge
+        if not browser_type_raw or browser_type_raw not in ["edge"]:
+            browser_type = "chrome"
+            logger.info(f"Forcing Chrome browser (BROWSER_TYPE was '{browser_type_raw}', defaulting to Chrome)")
+        else:
+            browser_type = browser_type_raw
+            logger.info(f"Using {browser_type} browser from environment variable")
         
         # Common options for both browsers
         # Memory optimization for limited server resources (512MB limit)
