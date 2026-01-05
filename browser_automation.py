@@ -121,9 +121,9 @@ class BrowserAutomation:
             uc_options = uc.ChromeOptions()
             
             # Use persistent profile directory to maintain session between restarts
+            # NOTE: Do NOT set user_data_dir via uc_options - pass it directly to uc.Chrome()
             profile_dir = str(config.DATA_DIR / "chrome_profile")
             os.makedirs(profile_dir, exist_ok=True)
-            uc_options.user_data_dir = profile_dir
             logger.info(f"Using Chrome profile directory: {profile_dir}")
             
             # Apply common arguments (skip headless and automation-related - UC handles these)
@@ -172,52 +172,29 @@ class BrowserAutomation:
                     break
             
             # Initialize undetected-chromedriver with version_main for stability
-            # Add timeout to prevent hanging (use shorter timeout in limited memory environments)
-            import threading
-            
-            driver_created = threading.Event()
-            driver_instance = [None]
-            init_error = [None]
-            
-            def create_driver():
-                try:
-                    if chrome_binary:
-                        driver_instance[0] = uc.Chrome(
-                            options=uc_options,
-                            browser_executable_path=chrome_binary,
-                            use_subprocess=False,
-                            version_main=None,  # Auto-detect version
-                            no_sandbox=True  # Required for Docker/containers
-                        )
-                    else:
-                        driver_instance[0] = uc.Chrome(
-                            options=uc_options,
-                            use_subprocess=False,
-                            version_main=None,
-                            no_sandbox=True
-                        )
-                    driver_created.set()
-                except Exception as e:
-                    init_error[0] = e
-                    driver_created.set()
-            
-            # Start driver creation in a thread
-            thread = threading.Thread(target=create_driver, daemon=True)
-            thread.start()
-            
-            # Wait up to 60 seconds for driver initialization
-            if not driver_created.wait(timeout=60):
-                logger.error("Chrome initialization timeout after 60 seconds")
-                raise Exception("Chrome initialization timeout after 60 seconds. Возможно, нехватка памяти или проблема с DISPLAY.")
-            
-            if init_error[0]:
-                logger.error(f"Error initializing undetected-chromedriver: {init_error[0]}")
-                raise init_error[0]
-            
-            if not driver_instance[0]:
-                raise Exception("Chrome driver was not created (unknown error)")
-            
-            driver = driver_instance[0]
+            # Use direct initialization with increased timeout handling
+            try:
+                # Pass user_data_dir directly to uc.Chrome() instead of via options
+                if chrome_binary:
+                    driver = uc.Chrome(
+                        options=uc_options,
+                        browser_executable_path=chrome_binary,
+                        user_data_dir=profile_dir,  # Pass directly, not via options
+                        use_subprocess=False,
+                        version_main=None,  # Auto-detect version
+                        no_sandbox=True  # Required for Docker/containers
+                    )
+                else:
+                    driver = uc.Chrome(
+                        options=uc_options,
+                        user_data_dir=profile_dir,  # Pass directly, not via options
+                        use_subprocess=False,
+                        version_main=None,
+                        no_sandbox=True
+                    )
+            except Exception as e:
+                logger.error(f"Error initializing undetected-chromedriver: {e}")
+                raise
             
             logger.info("Successfully initialized Chrome with undetected-chromedriver")
             return driver
