@@ -8,9 +8,9 @@ services:
     startCommand: python bot.py
     envVars:
       - key: HEADLESS_BROWSER
-        value: "true"
+        value: "false"
       - key: BROWSER_TYPE
-        value: "edge"
+        value: "chrome"
       - key: DATABASE_FILE
         value: "/app/data/freelancehunt_bot.db"
       - key: COOKIES_FILE

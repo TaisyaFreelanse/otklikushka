@@ -78,31 +78,28 @@ class BrowserAutomation:
         if config.HEADLESS_BROWSER:
             common_args.append('--headless=new')
         
-        # Try Chrome first (better for Linux servers)
-        # Default to Chrome if not explicitly set to edge
-        if browser_type != "edge":
+        # Use only the specified browser type (no fallback)
+        if browser_type == "chrome":
+            logger.info(f"Initializing Chrome browser (BROWSER_TYPE={browser_type})...")
             try:
                 return self._init_chrome(common_args)
             except Exception as e:
-                logger.warning(f"Failed to initialize Chrome, trying Edge: {e}")
-                # Fallback to Edge if Chrome fails
-                try:
-                    return self._init_edge(common_args)
-                except Exception as e2:
-                    logger.error(f"Failed to initialize Edge as fallback: {e2}")
-                    raise Exception(f"Не удалось инициализировать браузер (Chrome и Edge). Попробуйте проверить установку.")
-        else:
-            # Try Edge first
+                logger.error(f"Failed to initialize Chrome: {e}")
+                raise Exception(f"Не удалось инициализировать Chrome. Проверьте установку Chrome и доступность DISPLAY.")
+        elif browser_type == "edge":
+            logger.info(f"Initializing Edge browser (BROWSER_TYPE={browser_type})...")
             try:
                 return self._init_edge(common_args)
             except Exception as e:
-                logger.warning(f"Failed to initialize Edge, trying Chrome: {e}")
-                # Fallback to Chrome if Edge fails
-                try:
-                    return self._init_chrome(common_args)
-                except Exception as e2:
-                    logger.error(f"Failed to initialize Chrome as fallback: {e2}")
-                    raise Exception(f"Не удалось инициализировать браузер (Edge и Chrome). Попробуйте проверить установку.")
+                logger.error(f"Failed to initialize Edge: {e}")
+                raise Exception(f"Не удалось инициализировать Edge. Проверьте установку Edge.")
+        else:
+            logger.warning(f"Unknown browser type '{browser_type}', defaulting to Chrome")
+            try:
+                return self._init_chrome(common_args)
+            except Exception as e:
+                logger.error(f"Failed to initialize Chrome as default: {e}")
+                raise Exception(f"Не удалось инициализировать Chrome. Проверьте установку Chrome и доступность DISPLAY.")
     
     def _init_chrome(self, common_args: List[str]) -> webdriver.Chrome:
         """Initialize Chrome WebDriver using undetected-chromedriver to bypass Cloudflare."""
@@ -171,25 +168,52 @@ class BrowserAutomation:
                     break
             
             # Initialize undetected-chromedriver with version_main for stability
-            try:
-                if chrome_binary:
-                    driver = uc.Chrome(
-                        options=uc_options,
-                        browser_executable_path=chrome_binary,
-                        use_subprocess=False,
-                        version_main=None,  # Auto-detect version
-                        no_sandbox=True  # Required for Docker/containers
-                    )
-                else:
-                    driver = uc.Chrome(
-                        options=uc_options,
-                        use_subprocess=False,
-                        version_main=None,
-                        no_sandbox=True
-                    )
-            except Exception as e:
-                logger.error(f"Error initializing undetected-chromedriver: {e}")
-                raise
+            # Add timeout to prevent hanging (use shorter timeout in limited memory environments)
+            import threading
+            
+            driver_created = threading.Event()
+            driver_instance = [None]
+            init_error = [None]
+            
+            def create_driver():
+                try:
+                    if chrome_binary:
+                        driver_instance[0] = uc.Chrome(
+                            options=uc_options,
+                            browser_executable_path=chrome_binary,
+                            use_subprocess=False,
+                            version_main=None,  # Auto-detect version
+                            no_sandbox=True  # Required for Docker/containers
+                        )
+                    else:
+                        driver_instance[0] = uc.Chrome(
+                            options=uc_options,
+                            use_subprocess=False,
+                            version_main=None,
+                            no_sandbox=True
+                        )
+                    driver_created.set()
+                except Exception as e:
+                    init_error[0] = e
+                    driver_created.set()
+            
+            # Start driver creation in a thread
+            thread = threading.Thread(target=create_driver, daemon=True)
+            thread.start()
+            
+            # Wait up to 60 seconds for driver initialization
+            if not driver_created.wait(timeout=60):
+                logger.error("Chrome initialization timeout after 60 seconds")
+                raise Exception("Chrome initialization timeout after 60 seconds. Возможно, нехватка памяти или проблема с DISPLAY.")
+            
+            if init_error[0]:
+                logger.error(f"Error initializing undetected-chromedriver: {init_error[0]}")
+                raise init_error[0]
+            
+            if not driver_instance[0]:
+                raise Exception("Chrome driver was not created (unknown error)")
+            
+            driver = driver_instance[0]
             
             logger.info("Successfully initialized Chrome with undetected-chromedriver")
             return driver
