@@ -797,8 +797,50 @@ class BrowserAutomation:
                 except:
                     pass
             
+            # If comment not generated, fill it manually
             if not comment_generated:
-                print("⚠️ Комментарий не сгенерирован автоматически, продолжаем...")
+                print("⚠️ Комментарий не сгенерирован автоматически, заполняю вручную...")
+                time.sleep(1)
+                
+                # Find comment field
+                comment_selectors = [
+                    "//textarea[@name='comment']",
+                    "//textarea[@name='description']",
+                    "//textarea[@name='message']",
+                    "//textarea[contains(@class, 'comment')]",
+                    "//textarea[contains(@class, 'description')]",
+                    "//textarea[contains(@id, 'comment')]",
+                    "//textarea[contains(@id, 'description')]",
+                ]
+                
+                comment_field = None
+                for selector in comment_selectors:
+                    try:
+                        comment_field = self.wait_for_element(By.XPATH, selector, timeout=5)
+                        if comment_field:
+                            break
+                    except:
+                        continue
+                
+                if comment_field:
+                    # Fill with a standard professional comment
+                    default_comment = """Добрый день!
+
+Готов взяться за данный проект. Имею опыт в разработке и всегда стремлюсь к качественному результату.
+
+Буду рад обсудить детали проекта.
+
+С уважением."""
+                    
+                    try:
+                        comment_field.clear()
+                        comment_field.send_keys(default_comment)
+                        print("✅ Комментарий заполнен вручную")
+                        time.sleep(1)
+                    except Exception as e:
+                        print(f"⚠️ Не удалось заполнить комментарий: {e}")
+                else:
+                    print("⚠️ Не найдено поле для комментария")
             
             time.sleep(1)
             
@@ -896,21 +938,60 @@ class BrowserAutomation:
             if 'project' not in current_url.lower() or 'success' in current_url.lower():
                 return (True, "Ставка успешно отправлена", bid_amount, bid_deadline)
             
-            # Look for error messages
+            # Look for error messages - expanded selectors
             error_selectors = [
                 "//div[contains(@class, 'error')]",
                 "//div[contains(@class, 'alert-danger')]",
+                "//div[contains(@class, 'alert-error')]",
+                "//div[contains(@class, 'error-message')]",
                 "//span[contains(@class, 'error')]",
+                "//p[contains(@class, 'error')]",
+                "//*[contains(text(), 'исправьте ошибки')]",
+                "//*[contains(text(), 'Пожалуйста, исправьте')]",
+                "//*[contains(text(), 'Please correct')]",
+                "//*[contains(@class, 'validation-error')]",
+                "//*[contains(@class, 'form-error')]",
             ]
             
             for selector in error_selectors:
                 try:
-                    error_elem = self.driver.find_element(By.XPATH, selector)
-                    if error_elem.is_displayed():
-                        error_text = error_elem.text[:100]
-                        return (False, f"Ошибка при отправке: {error_text}", bid_amount, bid_deadline)
+                    error_elems = self.driver.find_elements(By.XPATH, selector)
+                    for error_elem in error_elems:
+                        if error_elem.is_displayed():
+                            error_text = error_elem.text.strip()[:200]
+                            if error_text:
+                                print(f"❌ Найдена ошибка формы: {error_text}")
+                                return (False, f"Ошибка при отправке: {error_text}", bid_amount, bid_deadline)
                 except:
                     continue
+            
+            # Also check page source for common error patterns
+            try:
+                page_source = self.driver.page_source.lower()
+                error_keywords = [
+                    'исправьте ошибки',
+                    'пожалуйста, исправьте',
+                    'error',
+                    'ошибка',
+                    'validation',
+                    'required field',
+                    'обязательное поле',
+                ]
+                for keyword in error_keywords:
+                    if keyword in page_source:
+                        # Try to find the actual error text
+                        try:
+                            error_divs = self.driver.find_elements(By.XPATH, f"//*[contains(translate(text(), 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ', 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'), '{keyword}')]")
+                            for error_div in error_divs:
+                                if error_div.is_displayed():
+                                    error_text = error_div.text.strip()[:200]
+                                    if error_text and len(error_text) > 10:
+                                        print(f"❌ Найдена ошибка на странице: {error_text}")
+                                        return (False, f"Ошибка при отправке: {error_text}", bid_amount, bid_deadline)
+                        except:
+                            pass
+            except:
+                pass
             
             # If no error found, assume success
             return (True, "Ставка отправлена", bid_amount, bid_deadline)
