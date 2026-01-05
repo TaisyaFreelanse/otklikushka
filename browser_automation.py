@@ -976,6 +976,95 @@ class BrowserAutomation:
             
             time.sleep(0.5)
             
+            # DIAGNOSTICS: Check all form fields before submission
+            print("🔍 Диагностика формы перед отправкой...")
+            form_status = {}
+            
+            # Check comment field
+            comment_check = False
+            comment_selectors = [
+                "//textarea[@name='comment']",
+                "//textarea[@name='description']",
+                "//textarea[@name='message']",
+                "//textarea[contains(@class, 'comment')]",
+            ]
+            for selector in comment_selectors:
+                try:
+                    comment_field = self.driver.find_element(By.XPATH, selector)
+                    comment_value = comment_field.get_attribute('value') or comment_field.text or ""
+                    comment_check = len(comment_value.strip()) > 10
+                    if comment_check:
+                        form_status['comment'] = f"✅ Заполнен ({len(comment_value)} символов)"
+                        break
+                except:
+                    continue
+            if not comment_check:
+                form_status['comment'] = "❌ НЕ заполнен"
+            
+            # Check deadline field
+            deadline_check = False
+            deadline_value = ""
+            for selector in deadline_selectors:
+                try:
+                    deadline_field = self.driver.find_element(By.XPATH, selector)
+                    deadline_value = deadline_field.get_attribute('value') or ""
+                    deadline_check = deadline_value and deadline_value.strip()
+                    if deadline_check:
+                        form_status['deadline'] = f"✅ Заполнен: {deadline_value} дней"
+                        break
+                except:
+                    continue
+            if not deadline_check:
+                form_status['deadline'] = "❌ НЕ заполнен"
+            
+            # Check amount field
+            amount_check = False
+            amount_value = ""
+            for selector in amount_selectors:
+                try:
+                    amount_field = self.driver.find_element(By.XPATH, selector)
+                    amount_value = amount_field.get_attribute('value') or ""
+                    amount_check = amount_value and amount_value.strip()
+                    if amount_check:
+                        form_status['amount'] = f"✅ Заполнен: {amount_value} грн"
+                        break
+                except:
+                    continue
+            if not amount_check:
+                form_status['amount'] = "❌ НЕ заполнен"
+            
+            # Print diagnostics
+            for field, status in form_status.items():
+                print(f"   {field}: {status}")
+            
+            # Check for validation errors BEFORE submission
+            print("🔍 Проверка ошибок валидации...")
+            validation_error_selectors = [
+                "//*[contains(@class, 'error') and contains(@class, 'field')]",
+                "//*[contains(@class, 'validation-error')]",
+                "//*[contains(@class, 'invalid')]",
+                "//*[@aria-invalid='true']",
+                "//*[contains(@class, 'has-error')]",
+            ]
+            validation_errors = []
+            for selector in validation_error_selectors:
+                try:
+                    error_elements = self.driver.find_elements(By.XPATH, selector)
+                    for elem in error_elements:
+                        if elem.is_displayed():
+                            error_text = elem.text.strip()
+                            if error_text and error_text not in validation_errors:
+                                validation_errors.append(error_text)
+                                print(f"   ⚠️ Найдена ошибка валидации: {error_text}")
+                except:
+                    continue
+            
+            if validation_errors:
+                return (False, f"Ошибки валидации перед отправкой: {'; '.join(validation_errors[:3])}", bid_amount, bid_deadline)
+            
+            # Additional wait before submission
+            time.sleep(1 + random.uniform(0, 0.5))
+            
             # Submit the bid form
             submit_selectors = [
                 "//button[@type='submit']",
@@ -997,6 +1086,7 @@ class BrowserAutomation:
             if not submit_button:
                 return (False, "Не удалось найти кнопку отправки ставки", bid_amount, bid_deadline)
             
+            print("🚀 Отправка формы...")
             if not self.safe_click(submit_button):
                 return (False, "Не удалось отправить ставку", bid_amount, bid_deadline)
             
