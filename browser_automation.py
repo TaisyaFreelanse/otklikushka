@@ -834,13 +834,47 @@ class BrowserAutomation:
                     
                     try:
                         comment_field.clear()
+                        time.sleep(0.3)
                         comment_field.send_keys(default_comment)
-                        print("✅ Комментарий заполнен вручную")
-                        time.sleep(1)
+                        time.sleep(0.5)
+                        
+                        # Verify comment was filled
+                        comment_value = comment_field.get_attribute('value') or comment_field.text
+                        if comment_value and len(comment_value.strip()) > 10:
+                            print("✅ Комментарий заполнен вручную и проверен")
+                            comment_generated = True
+                        else:
+                            print("⚠️ Комментарий не заполнился, пытаюсь еще раз...")
+                            # Try JavaScript fill as fallback
+                            self.driver.execute_script("arguments[0].value = arguments[1];", comment_field, default_comment)
+                            time.sleep(0.5)
+                            comment_value = comment_field.get_attribute('value') or comment_field.text
+                            if comment_value and len(comment_value.strip()) > 10:
+                                print("✅ Комментарий заполнен через JavaScript")
+                                comment_generated = True
+                            else:
+                                print("❌ Не удалось заполнить комментарий")
                     except Exception as e:
-                        print(f"⚠️ Не удалось заполнить комментарий: {e}")
+                        print(f"⚠️ Ошибка при заполнении комментария: {e}")
                 else:
                     print("⚠️ Не найдено поле для комментария")
+                    
+                    # Try to find any textarea on the page
+                    try:
+                        all_textareas = self.driver.find_elements(By.TAG_NAME, "textarea")
+                        if all_textareas:
+                            print(f"🔍 Найдено {len(all_textareas)} textarea элементов, пытаюсь заполнить первый...")
+                            comment_field = all_textareas[0]
+                            default_comment = "Добрый день! Готов взяться за данный проект. Имею опыт в разработке. Буду рад обсудить детали."
+                            comment_field.clear()
+                            comment_field.send_keys(default_comment)
+                            time.sleep(1)
+                            comment_value = comment_field.get_attribute('value') or comment_field.text
+                            if comment_value and len(comment_value.strip()) > 10:
+                                print("✅ Комментарий заполнен через альтернативный метод")
+                                comment_generated = True
+                    except Exception as e:
+                        print(f"⚠️ Не удалось найти альтернативное поле комментария: {e}")
             
             time.sleep(1)
             
@@ -905,6 +939,42 @@ class BrowserAutomation:
                 time.sleep(0.5 + random.uniform(0, 0.5))
             else:
                 print("⚠️ Не найдено поле для стоимости")
+            
+            # Final check: verify comment is filled before submitting
+            if not comment_generated:
+                print("⚠️ ВНИМАНИЕ: Комментарий не заполнен! Проверяю перед отправкой...")
+                time.sleep(1)
+                comment_selectors = [
+                    "//textarea[@name='comment']",
+                    "//textarea[@name='description']",
+                    "//textarea[@name='message']",
+                    "//textarea[contains(@class, 'comment')]",
+                ]
+                comment_filled = False
+                for selector in comment_selectors:
+                    try:
+                        comment_field = self.driver.find_element(By.XPATH, selector)
+                        comment_value = comment_field.get_attribute('value') or comment_field.text
+                        if comment_value and len(comment_value.strip()) > 10:
+                            comment_filled = True
+                            print("✅ Комментарий найден и заполнен")
+                            break
+                    except:
+                        continue
+                
+                if not comment_filled:
+                    print("❌ КРИТИЧНО: Комментарий не заполнен! Попытка заполнить еще раз...")
+                    # Last attempt to fill comment
+                    try:
+                        all_textareas = self.driver.find_elements(By.TAG_NAME, "textarea")
+                        if all_textareas:
+                            comment_field = all_textareas[0]
+                            self.driver.execute_script("arguments[0].value = 'Добрый день! Готов взяться за данный проект. Имею опыт в разработке. Буду рад обсудить детали.';", comment_field)
+                            time.sleep(1)
+                    except:
+                        pass
+            
+            time.sleep(0.5)
             
             # Submit the bid form
             submit_selectors = [
