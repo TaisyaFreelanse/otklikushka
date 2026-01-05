@@ -682,7 +682,7 @@ class FreelancehuntScraper:
                 if not project:
                     continue
                 
-                # Filter by time FIRST - only projects created less than 24 hours ago
+                # Filter by time FIRST - only projects created less than 1 hour ago
                 created_at = project.get('created_at')
                 if created_at:
                     try:
@@ -698,9 +698,10 @@ class FreelancehuntScraper:
                         # Calculate time difference
                         time_diff = now - created_at_dt
                         
-                        # Skip projects older than 24 hours
-                        if time_diff.total_seconds() > 86400:  # 24 hours in seconds
-                            logger.debug(f"Skipping project {project['id']} - too old ({time_diff.days} days ago)")
+                        # Skip projects older than 1 hour
+                        if time_diff.total_seconds() > 3600:  # 1 hour in seconds
+                            hours_ago = time_diff.total_seconds() / 3600
+                            logger.debug(f"Skipping project {project['id']} - too old ({hours_ago:.1f} hours ago)")
                             continue
                     except Exception as e:
                         logger.warning(f"Error parsing created_at for project {project.get('id')}: {e}")
