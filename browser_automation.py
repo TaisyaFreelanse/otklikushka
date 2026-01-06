@@ -1004,7 +1004,18 @@ class BrowserAutomation:
             # Check deadline field
             deadline_check = False
             deadline_value = ""
-            for selector in deadline_selectors:
+            deadline_selectors_check = [
+                "//input[@name='deadline']",
+                "//input[@name='days']",
+                "//input[@name='duration']",
+                "//input[contains(@placeholder, 'дн')]",
+                "//input[contains(@placeholder, 'days')]",
+                "//input[@type='number' and contains(@class, 'deadline')]",
+                "//input[@type='number' and contains(@class, 'days')]",
+                "//input[contains(@id, 'deadline')]",
+                "//input[contains(@id, 'days')]",
+            ]
+            for selector in deadline_selectors_check:
                 try:
                     deadline_field = self.driver.find_element(By.XPATH, selector)
                     deadline_value = deadline_field.get_attribute('value') or ""
@@ -1020,7 +1031,15 @@ class BrowserAutomation:
             # Check amount field
             amount_check = False
             amount_value = ""
-            for selector in amount_selectors:
+            amount_selectors_check = [
+                "//input[@name='amount']",
+                "//input[@name='cost']",
+                "//input[@name='price']",
+                "//input[contains(@placeholder, 'UAH')]",
+                "//input[contains(@placeholder, 'грн')]",
+                "//input[@type='number' and contains(@class, 'amount')]",
+            ]
+            for selector in amount_selectors_check:
                 try:
                     amount_field = self.driver.find_element(By.XPATH, selector)
                     amount_value = amount_field.get_attribute('value') or ""
