@@ -733,6 +733,12 @@ class FreelancehuntScraper:
                     'ai генерация',
                     'генерация изображений ai',
                     'ai изображения',
+                    'баннеры',
+                    'креативы для instagram',
+                    'креативы для instagram-рекламы',
+                    'instagram реклама',
+                    'рекламные баннеры',
+                    'баннеры для рекламы',
                 ]
                 # Also check title for AI/design keywords
                 excluded_title_keywords = [
@@ -746,6 +752,13 @@ class FreelancehuntScraper:
                     'ai изображения',
                     'коммерческие изображения',
                     'качественные изображения',
+                    'баннеры',
+                    'креативы для instagram',
+                    'креативы для instagram-рекламы',
+                    'instagram реклама',
+                    'instagram-рекламы',
+                    'рекламные баннеры',
+                    'баннеры для рекламы',
                 ]
                 # Check category
                 if any(excluded in project_category for excluded in excluded_categories_global):
@@ -821,6 +834,12 @@ class FreelancehuntScraper:
                             'ai генерация',
                             'генерация изображений ai',
                             'ai изображения',
+                            'баннеры',
+                            'креативы для instagram',
+                            'креативы для instagram-рекламы',
+                            'instagram реклама',
+                            'рекламные баннеры',
+                            'баннеры для рекламы',
                         ]
                         if any(excluded in project_category.lower() for excluded in excluded_categories):
                             project_matches_category = False
