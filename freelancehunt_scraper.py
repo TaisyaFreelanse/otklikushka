@@ -714,6 +714,7 @@ class FreelancehuntScraper:
                 
                 # Exclude unwanted categories FIRST (before category matching)
                 project_category = (project.get('category') or '').lower()
+                project_title = (project.get('title') or '').lower()
                 excluded_categories_global = [
                     'интернет-магазины и электронная коммерция',
                     'интернет-магазины',
@@ -723,9 +724,36 @@ class FreelancehuntScraper:
                     'фирменный стиль',
                     'брендинг',
                     'логотип',
+                    'ai в дизайне',
+                    'ai / дизайн',
+                    'ai дизайн',
+                    'изображения для сайта',
+                    'tiktok shop',
+                    'генерация изображений',
+                    'ai генерация',
+                    'генерация изображений ai',
+                    'ai изображения',
                 ]
+                # Also check title for AI/design keywords
+                excluded_title_keywords = [
+                    'ai / дизайн',
+                    'ai в дизайне',
+                    'изображения для сайта и tiktok shop',
+                    'изображения для сайта',
+                    'tiktok shop',
+                    'генерация изображений',
+                    'ai генерация',
+                    'ai изображения',
+                    'коммерческие изображения',
+                    'качественные изображения',
+                ]
+                # Check category
                 if any(excluded in project_category for excluded in excluded_categories_global):
                     logger.debug(f"Skipping project {project_id} due to excluded category: {project_category}")
+                    continue
+                # Check title
+                if any(keyword in project_title for keyword in excluded_title_keywords):
+                    logger.debug(f"Skipping project {project_id} due to excluded keywords in title: {project_title[:100]}")
                     continue
                 
                 # IMPORTANT: Only process projects that match specified categories
@@ -784,6 +812,15 @@ class FreelancehuntScraper:
                             'фирменный стиль',
                             'брендинг',
                             'логотип',
+                            'ai в дизайне',
+                            'ai / дизайн',
+                            'ai дизайн',
+                            'изображения для сайта',
+                            'tiktok shop',
+                            'генерация изображений',
+                            'ai генерация',
+                            'генерация изображений ai',
+                            'ai изображения',
                         ]
                         if any(excluded in project_category.lower() for excluded in excluded_categories):
                             project_matches_category = False
