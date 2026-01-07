@@ -713,8 +713,11 @@ class FreelancehuntScraper:
                     continue
                 
                 # Exclude unwanted categories FIRST (before category matching)
-                project_category = (project.get('category') or '').lower()
-                project_title = (project.get('title') or '').lower()
+                project_category_raw = project.get('category') or ''
+                project_category = project_category_raw.lower()
+                project_title_raw = project.get('title') or ''
+                project_title = project_title_raw.lower()
+                
                 excluded_categories_global = [
                     'интернет-магазины и электронная коммерция',
                     'интернет-магазины',
@@ -740,7 +743,7 @@ class FreelancehuntScraper:
                     'рекламные баннеры',
                     'баннеры для рекламы',
                 ]
-                # Also check title for AI/design keywords
+                # Also check title for AI/design keywords and photo/banner related
                 excluded_title_keywords = [
                     'ai / дизайн',
                     'ai в дизайне',
@@ -759,14 +762,45 @@ class FreelancehuntScraper:
                     'instagram-рекламы',
                     'рекламные баннеры',
                     'баннеры для рекламы',
+                    'главное фото',
+                    'фото для товара',
+                    'создание фото',
+                    'обработка фото',
+                    'фото товара',
+                    'фотография товара',
+                    'фото продукта',
+                    'фотография продукта',
+                    'product photo',
+                    'товарное фото',
                 ]
-                # Check category
-                if any(excluded in project_category for excluded in excluded_categories_global):
-                    logger.debug(f"Skipping project {project_id} due to excluded category: {project_category}")
+                # Check category FIRST - must be case-insensitive substring match
+                # Also check original case category for exact matches
+                category_excluded = False
+                if project_category_raw:
+                    # Check both lowercase and original case
+                    for excluded in excluded_categories_global:
+                        excluded_lower = excluded.lower()
+                        if (excluded_lower in project_category or 
+                            excluded_lower == project_category or
+                            excluded in project_category_raw or
+                            project_category_raw.lower() == excluded_lower):
+                            logger.info(f"❌ Пропускаю проект {project_id}: исключенная категория '{project_category_raw}' (matched '{excluded}')")
+                            category_excluded = True
+                            break
+                
+                if category_excluded:
                     continue
-                # Check title
-                if any(keyword in project_title for keyword in excluded_title_keywords):
-                    logger.debug(f"Skipping project {project_id} due to excluded keywords in title: {project_title[:100]}")
+                
+                # Check title SECOND - must be case-insensitive substring match
+                title_excluded = False
+                for keyword in excluded_title_keywords:
+                    keyword_lower = keyword.lower()
+                    if keyword_lower in project_title or keyword in project_title_raw:
+                        logger.info(f"❌ Пропускаю проект {project_id}: исключенные ключевые слова в названии '{project_title_raw[:100]}' (matched '{keyword}')")
+                        title_excluded = True
+                        break
+                
+                if title_excluded:
                     continue
                 
                 # IMPORTANT: Only process projects that match specified categories
