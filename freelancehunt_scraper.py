@@ -806,13 +806,26 @@ class FreelancehuntScraper:
                             project_matches_category = True
                             break
                         
-                        # Special mappings for common variations
+                        # Special mappings for allowed categories (exact matches and variations)
                         category_mappings = {
-                            'веб-программирование': ['веб-программирование', 'web development', 'веб-разработка'],
-                            'веб-разработка': ['веб-разработка', 'веб-программирование', 'web development'],
-                            'backend': ['бэкенд', 'backend', 'back-end', 'бэк-энд'],
-                            'frontend': ['фронтенд', 'frontend', 'front-end', 'фронт-энд'],
-                            'программирование': ['программирование', 'разработка', 'development'],
+                            'ai и машинное обучение': ['ai и машинное обучение', 'машинное обучение', 'machine learning', 'ml', 'ai', 'artificial intelligence'],
+                            'ar и vr разработка': ['ar и vr разработка', 'ar/vr', 'virtual reality', 'augmented reality', 'vr разработка', 'ar разработка'],
+                            'c и c++': ['c и c++', 'c++', 'c/c++', 'с++', 'c плюс плюс'],
+                            'c#': ['c#', 'c sharp', 'csharp', 'с#'],
+                            'cms': ['cms', 'система управления контентом'],
+                            'html и css верстка': ['html и css верстка', 'html/css', 'html css', 'верстка', 'верстка html', 'frontend верстка'],
+                            'java': ['java', 'джава'],
+                            'javascript и typescript': ['javascript и typescript', 'javascript', 'typescript', 'js', 'ts', 'js/ts'],
+                            'php': ['php', 'пхп'],
+                            'python': ['python', 'питон'],
+                            'базы данных и sql': ['базы данных и sql', 'базы данных', 'sql', 'database', 'бд'],
+                            'веб-программирование': ['веб-программирование', 'web development', 'веб-разработка', 'web programming'],
+                            'десктопные приложения': ['десктопные приложения', 'desktop applications', 'desktop приложения', 'приложения для пк'],
+                            'криптовалюта и blockchain': ['криптовалюта и blockchain', 'криптовалюта', 'blockchain', 'блокчейн', 'crypto', 'cryptocurrency'],
+                            'парсинг данных': ['парсинг данных', 'парсинг', 'parsing', 'web scraping', 'скрапинг'],
+                            'разработка ботов': ['разработка ботов', 'боты', 'telegram bot', 'telegram бот', 'бот разработка'],
+                            'разработка игр': ['разработка игр', 'game development', 'игры', 'game dev'],
+                            'тестирование и qa': ['тестирование и qa', 'тестирование', 'qa', 'quality assurance', 'тестировщик'],
                         }
                         
                         # Exclude unwanted categories
@@ -845,28 +858,13 @@ class FreelancehuntScraper:
                             project_matches_category = False
                             break
                         
-                        # Check if category matches any variation
+                        # Check if category matches any variation using mappings
                         if cat_lower in category_mappings:
                             for variation in category_mappings[cat_lower]:
-                                if variation in project_category or variation in search_text:
-                                    project_matches_category = True
-                                    break
-                            if project_matches_category:
-                                break
-                        
-                        # Special mappings for common variations
-                        category_mappings = {
-                            'веб-программирование': ['веб-программирование', 'web development', 'web development', 'веб-разработка'],
-                            'веб-разработка': ['веб-разработка', 'веб-программирование', 'web development'],
-                            'backend': ['бэкенд', 'backend', 'back-end', 'бэк-энд'],
-                            'frontend': ['фронтенд', 'frontend', 'front-end', 'фронт-энд'],
-                            'программирование': ['программирование', 'разработка', 'development'],
-                        }
-                        
-                        # Check if category matches any variation
-                        if cat_lower in category_mappings:
-                            for variation in category_mappings[cat_lower]:
-                                if variation in project_category or variation in search_text:
+                                variation_lower = variation.lower()
+                                if (variation_lower in project_category or 
+                                    project_category in variation_lower or
+                                    variation_lower in search_text):
                                     project_matches_category = True
                                     break
                             if project_matches_category:
