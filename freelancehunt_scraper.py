@@ -718,30 +718,36 @@ class FreelancehuntScraper:
                 project_category = project_category_raw.lower()
                 
                 excluded_categories_global = [
-                    'интернет-магазины и электронная коммерция',
-                    'интернет-магазины',
-                    'электронная коммерция',
-                    'дизайн визиток',
-                    'визитки',
-                    'фирменный стиль',
-                    'брендинг',
-                    'логотип',
-                    'ai в дизайне',
-                    'ai / дизайн',
-                    'ai дизайн',
-                    'изображения для сайта',
-                    'tiktok shop',
-                    'генерация изображений',
-                    'ai генерация',
-                    'генерация изображений ai',
-                    'ai изображения',
-                    'баннеры',
-                    'креативы для instagram',
-                    'креативы для instagram-рекламы',
-                    'instagram реклама',
-                    'рекламные баннеры',
-                    'баннеры для рекламы',
-                ]
+                            'интернет-магазины и электронная коммерция',
+                            'интернет-магазины',
+                            'электронная коммерция',
+                            'дизайн визиток',
+                            'визитки',
+                            'фирменный стиль',
+                            'брендинг',
+                            'логотип',
+                            'ai в дизайне',
+                            'ai / дизайн',
+                            'ai дизайн',
+                            'изображения для сайта',
+                            'tiktok shop',
+                            'генерация изображений',
+                            'ai генерация',
+                            'генерация изображений ai',
+                            'ai изображения',
+                            'баннеры',
+                            'креативы для instagram',
+                            'креативы для instagram-рекламы',
+                            'instagram реклама',
+                            'рекламные баннеры',
+                            'баннеры для рекламы',
+                            'ai создание видео',
+                            'ai создание',
+                            'создание видео',
+                            'обработка видео',
+                            'видео',
+                            'монтаж видео',
+                        ]
                 # Check category FIRST - must be case-insensitive substring match
                 # Also check original case category for exact matches
                 category_excluded = False
@@ -775,19 +781,28 @@ class FreelancehuntScraper:
                             continue
                         cat_lower = cat.lower()
                         
-                        # Direct category match ONLY - check category field, not title
-                        if project_category and (
-                            cat_lower in project_category or 
-                            project_category in cat_lower or
-                            any(word in project_category for word in cat_lower.split() if len(word) > 3)
-                        ):
-                            project_matches_category = True
-                            logger.debug(f"✅ Проект {project_id} совпадает с категорией: '{cat}' (категория проекта: '{project_category_raw}')")
-                            break
+                        # Direct category match ONLY - STRICT matching (exact or contains full category name)
+                        if project_category:
+                            # Exact match
+                            if cat_lower == project_category or project_category == cat_lower:
+                                project_matches_category = True
+                                logger.info(f"✅ Проект {project_id} точно совпадает с категорией: '{cat}' (категория проекта: '{project_category_raw}')")
+                                break
+                            # Contains full category name (e.g., "Веб-программирование" in "Веб-программирование, JavaScript")
+                            if cat_lower in project_category:
+                                project_matches_category = True
+                                logger.info(f"✅ Проект {project_id} содержит категорию: '{cat}' (категория проекта: '{project_category_raw}')")
+                                break
+                            # Check if project category is part of allowed category (e.g., "JavaScript" matches "Javascript и Typescript")
+                            if project_category in cat_lower:
+                                project_matches_category = True
+                                logger.info(f"✅ Проект {project_id} категория входит в разрешенную: '{project_category_raw}' в '{cat}'")
+                                break
                         
                         # Special mappings for allowed categories (exact matches and variations)
+                        # IMPORTANT: Use strict matching to avoid false positives
                         category_mappings = {
-                            'ai и машинное обучение': ['ai и машинное обучение', 'машинное обучение', 'machine learning', 'ml', 'ai', 'artificial intelligence'],
+                            'ai и машинное обучение': ['ai и машинное обучение', 'машинное обучение', 'machine learning', 'ml', 'artificial intelligence'],
                             'ar и vr разработка': ['ar и vr разработка', 'ar/vr', 'virtual reality', 'augmented reality', 'vr разработка', 'ar разработка'],
                             'c и c++': ['c и c++', 'c++', 'c/c++', 'с++', 'c плюс плюс'],
                             'c#': ['c#', 'c sharp', 'csharp', 'с#'],
@@ -832,21 +847,37 @@ class FreelancehuntScraper:
                             'instagram реклама',
                             'рекламные баннеры',
                             'баннеры для рекламы',
+                            'ai создание видео',
+                            'ai создание',
+                            'создание видео',
+                            'обработка видео',
+                            'видео',
+                            'монтаж видео',
                         ]
                         if any(excluded in project_category.lower() for excluded in excluded_categories):
                             project_matches_category = False
                             break
                         
                         # Check if category matches any variation using mappings (CATEGORY ONLY, NO TITLE)
+                        # STRICT matching - variation must be exact word or phrase in category
                         if cat_lower in category_mappings:
                             for variation in category_mappings[cat_lower]:
                                 variation_lower = variation.lower()
-                                # Check ONLY in project category, NOT in title
-                                if (variation_lower in project_category or 
-                                    project_category in variation_lower):
+                                # STRICT check: variation must be a complete word/phrase, not just substring
+                                # This prevents "ai" matching "ai создание видео"
+                                if variation_lower == project_category or project_category == variation_lower:
+                                    # Exact match
                                     project_matches_category = True
-                                    logger.debug(f"✅ Проект {project_id} совпадает с категорией через маппинг: '{cat}' -> '{variation}' (категория проекта: '{project_category_raw}')")
+                                    logger.info(f"✅ Проект {project_id} точно совпадает через маппинг: '{cat}' -> '{variation}' (категория проекта: '{project_category_raw}')")
                                     break
+                                elif len(variation_lower) > 3 and variation_lower in project_category:
+                                    # Only if variation is long enough (avoid "ai", "ml" matching incorrectly)
+                                    # Check word boundaries if possible
+                                    import re
+                                    if re.search(r'\b' + re.escape(variation_lower) + r'\b', project_category):
+                                        project_matches_category = True
+                                        logger.info(f"✅ Проект {project_id} совпадает через маппинг (слово): '{cat}' -> '{variation}' (категория проекта: '{project_category_raw}')")
+                                        break
                             if project_matches_category:
                                 break
                 
