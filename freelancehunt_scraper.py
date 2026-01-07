@@ -713,10 +713,9 @@ class FreelancehuntScraper:
                     continue
                 
                 # Exclude unwanted categories FIRST (before category matching)
+                # FILTER BY CATEGORY ONLY - NO TITLE MATCHING
                 project_category_raw = project.get('category') or ''
                 project_category = project_category_raw.lower()
-                project_title_raw = project.get('title') or ''
-                project_title = project_title_raw.lower()
                 
                 excluded_categories_global = [
                     'интернет-магазины и электронная коммерция',
@@ -743,36 +742,6 @@ class FreelancehuntScraper:
                     'рекламные баннеры',
                     'баннеры для рекламы',
                 ]
-                # Also check title for AI/design keywords and photo/banner related
-                excluded_title_keywords = [
-                    'ai / дизайн',
-                    'ai в дизайне',
-                    'изображения для сайта и tiktok shop',
-                    'изображения для сайта',
-                    'tiktok shop',
-                    'генерация изображений',
-                    'ai генерация',
-                    'ai изображения',
-                    'коммерческие изображения',
-                    'качественные изображения',
-                    'баннеры',
-                    'креативы для instagram',
-                    'креативы для instagram-рекламы',
-                    'instagram реклама',
-                    'instagram-рекламы',
-                    'рекламные баннеры',
-                    'баннеры для рекламы',
-                    'главное фото',
-                    'фото для товара',
-                    'создание фото',
-                    'обработка фото',
-                    'фото товара',
-                    'фотография товара',
-                    'фото продукта',
-                    'фотография продукта',
-                    'product photo',
-                    'товарное фото',
-                ]
                 # Check category FIRST - must be case-insensitive substring match
                 # Also check original case category for exact matches
                 category_excluded = False
@@ -791,53 +760,29 @@ class FreelancehuntScraper:
                 if category_excluded:
                     continue
                 
-                # Check title SECOND - must be case-insensitive substring match
-                title_excluded = False
-                for keyword in excluded_title_keywords:
-                    keyword_lower = keyword.lower()
-                    if keyword_lower in project_title or keyword in project_title_raw:
-                        logger.info(f"❌ Пропускаю проект {project_id}: исключенные ключевые слова в названии '{project_title_raw[:100]}' (matched '{keyword}')")
-                        title_excluded = True
-                        break
-                
-                if title_excluded:
-                    continue
-                
                 # IMPORTANT: Only process projects that match specified categories
+                # FILTER BY CATEGORY ONLY - NO TITLE MATCHING
                 # If no categories specified, skip ALL projects (no bids on projects outside categories)
                 project_matches_category = False  # Default: NO match unless categories are specified and matched
                 
                 if categories and len(categories) > 0:
                     # Only filter if categories are specified
+                    # FILTER BY CATEGORY ONLY - NO TITLE MATCHING
                     project_matches_category = False
-                    
-                    # Build search text from title, category, and description (if available)
-                    search_text = (project.get('title', '') + ' ' + 
-                                 (project.get('category', '') or '')).lower()
-                    
-                    # Check if any category keyword matches (project_category already set above)
                     
                     for cat in categories:
                         if not cat:
                             continue
                         cat_lower = cat.lower()
                         
-                        # Direct category match (exact or contains)
+                        # Direct category match ONLY - check category field, not title
                         if project_category and (
                             cat_lower in project_category or 
                             project_category in cat_lower or
                             any(word in project_category for word in cat_lower.split() if len(word) > 3)
                         ):
                             project_matches_category = True
-                            break
-                        
-                        # Check in title/description (broader matching)
-                        if cat_lower in search_text or any(
-                            keyword in search_text 
-                            for keyword in cat_lower.split()
-                            if len(keyword) > 2
-                        ):
-                            project_matches_category = True
+                            logger.debug(f"✅ Проект {project_id} совпадает с категорией: '{cat}' (категория проекта: '{project_category_raw}')")
                             break
                         
                         # Special mappings for allowed categories (exact matches and variations)
@@ -892,14 +837,15 @@ class FreelancehuntScraper:
                             project_matches_category = False
                             break
                         
-                        # Check if category matches any variation using mappings
+                        # Check if category matches any variation using mappings (CATEGORY ONLY, NO TITLE)
                         if cat_lower in category_mappings:
                             for variation in category_mappings[cat_lower]:
                                 variation_lower = variation.lower()
+                                # Check ONLY in project category, NOT in title
                                 if (variation_lower in project_category or 
-                                    project_category in variation_lower or
-                                    variation_lower in search_text):
+                                    project_category in variation_lower):
                                     project_matches_category = True
+                                    logger.debug(f"✅ Проект {project_id} совпадает с категорией через маппинг: '{cat}' -> '{variation}' (категория проекта: '{project_category_raw}')")
                                     break
                             if project_matches_category:
                                 break
